@@ -9,7 +9,7 @@ The workflow does not edit the Modrinth project page description, gallery, categ
 1. Create and configure both Modrinth projects. Set their source links to:
    - Soul Link: https://github.com/qwasdf-1/soul-link
    - Terra Rasa: https://github.com/qwasdf-1/terra-rasa
-2. Create a Modrinth token with the VERSION_CREATE permission.
+2. Create a Modrinth token with `PROJECT_READ` and `VERSION_CREATE` permissions. `PROJECT_READ` lets the publisher resolve draft projects; `VERSION_CREATE` lets it upload versions.
 3. In the Soul Link GitHub repository, add the Actions secret MODRINTH_TOKEN with that token.
 4. Add these repository Actions variables:
    - MODRINTH_PROJECT_URL with the full Soul Link Modrinth URL.
@@ -26,4 +26,4 @@ If a GitHub Release already exists and needs to be published on Modrinth, run Pu
 
 ## Checks and failures
 
-The workflow stops if the tag does not match the mod version at that tag, if the expected runtime jar or checksum is missing, if the checksum fails, or if either Modrinth project's source URL points elsewhere. The Modrinth token is only used for version creation; project lookups are public API requests.
+The workflow stops if the tag does not match the mod version at that tag, if the expected runtime jar or checksum is missing, if the checksum fails, or if either Modrinth project's source URL points elsewhere. The token is used to resolve both projects (including while they are drafts) and create the Soul Link version. The publisher does not change project visibility: submit each draft for Modrinth review in its project settings before expecting it to appear publicly.
