@@ -86,7 +86,7 @@ The integration suites run the mod on a real dedicated server with headless clie
 
 ## Not included
 
-Shared jumping, shared inventory, half-heart mode, manhunt, settings screens, and meta-progression are not implemented.
+Features like shared jumping, shared inventory, half-heart mode, manhunt, settings screens, and meta-progression are not implemented.
 
 ## License
 
