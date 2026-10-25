@@ -20,7 +20,7 @@ The workflow resolves each URL through Modrinth, checks that each project links 
 
 ## Future releases
 
-Push a version tag such as v0.2.0. The release workflow builds and attaches the jar and SHA-256 checksum. When the GitHub Release is published, the Modrinth workflow uploads the runtime jar with the matching Minecraft version, Fabric loader, dedicated-server environment, and Fabric API dependency. It also marks Terra Rasa as an embedded dependency because Soul Link bundles the library in its jar.
+Push a version tag such as v0.2.0. The release workflow builds and attaches the jar and SHA-256 checksum, then dispatches the Modrinth publishing workflow with that tag. The publisher uploads the runtime jar with the matching Minecraft version, Fabric loader, dedicated-server environment, and Fabric API dependency. It also marks Terra Rasa as an embedded dependency because Soul Link bundles the library in its jar.
 
 If a GitHub Release already exists and needs to be published on Modrinth, run Publish to Modrinth manually with its tag. Each version number can only be published once on Modrinth.
 
