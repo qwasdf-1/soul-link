@@ -1,0 +1,20 @@
+pluginManagement {
+    repositories {
+        maven {
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
+        }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+rootProject.name = 'soullink'
+
+// Soul Link is built on the Terra Rasa world-reset library (dev.terrarasa:terra-rasa). A checkout next
+// to this one (../terra-rasa) replaces the published artifact, so both can be changed and tested
+// together; pass -PterraRasaPath=<dir> to use another checkout, or -PterraRasaPath= to use the artifact.
+def terraRasa = file(providers.gradleProperty('terraRasaPath').getOrElse('../terra-rasa'))
+if (terraRasa.path && new File(terraRasa, 'settings.gradle').isFile()) {
+    includeBuild(terraRasa)
+}

@@ -1,0 +1,217 @@
+{
+  "name": "Soul Link reference server pack",
+  "minecraft": "26.2",
+  "loader": "fabric",
+  "note": "Pinned candidate modpack for compatibility tests T14, T15, T18. Mods are downloaded from Modrinth at test time and verified by SHA-512; nothing is redistributed.",
+  "mods": [
+    {
+      "slug": "lithostitched",
+      "role": "library",
+      "purpose": "Worldgen library required by Terralith and Tectonic",
+      "version": "1.8.0-fabric-26.2",
+      "versionId": "sGGUpIGT",
+      "file": "lithostitched-1.8.0-fabric-26.2.jar",
+      "url": "https://cdn.modrinth.com/data/XaDC71GB/versions/sGGUpIGT/lithostitched-1.8.0-fabric-26.2.jar",
+      "sha512": "a1736f1fa4b94ee7eae38ee13f0625f1128523f330e9972ca2f1be3186cf7b8cc4d8003d1d5f4fee7cb186a97723b3bce8e4e3587f92e5ca64fc8b0b9830e4e2",
+      "size": 1022295
+    },
+    {
+      "slug": "terralith",
+      "role": "worldgen",
+      "purpose": "Overworld biomes and terrain (T14)",
+      "version": "2.6.4",
+      "versionId": "OxfI2n80",
+      "file": "Terralith_26.2_v2.6.4.jar",
+      "url": "https://cdn.modrinth.com/data/8oi3bsk5/versions/OxfI2n80/Terralith_26.2_v2.6.4.jar",
+      "sha512": "0830f4601674c4ea58d247a71bfdc820e4676900e173c7d6df4e58e348a09da43b279cea060df7b67e6f74c84e2a05b401b2df79836c37cffc8dc994844ab250",
+      "size": 2974843
+    },
+    {
+      "slug": "tectonic",
+      "role": "worldgen",
+      "purpose": "Overworld terrain shaping (T14)",
+      "version": "3.0.28-fabric-26.2",
+      "versionId": "tGbplDzo",
+      "file": "tectonic-3.0.28-fabric-26.2.jar",
+      "url": "https://cdn.modrinth.com/data/lWDHr9jE/versions/tGbplDzo/tectonic-3.0.28-fabric-26.2.jar",
+      "sha512": "c653ee42fe48c1be9512fa7791e8495095ae01cb607555202714bbb95cb49da272128bb295e8f8c262b63739e7ca2de4bba9196e1738b06012b498d220b55acf",
+      "size": 451635
+    },
+    {
+      "slug": "incendium",
+      "role": "worldgen",
+      "purpose": "Nether biomes and structures (T14)",
+      "version": "5.5.1",
+      "versionId": "vPwuqZ5y",
+      "file": "Incendium_26.2_v5.5.1.jar",
+      "url": "https://cdn.modrinth.com/data/ZVzW5oNS/versions/vPwuqZ5y/Incendium_26.2_v5.5.1.jar",
+      "sha512": "202e1f23c64c37330d3ec0bfd80331355d15cc8d01f151edc4dabfa8ce719650d10f468df5bf523a93461d78c3660a2cdedbc1037fb08396c13f22b6457352f0",
+      "size": 4175523
+    },
+    {
+      "slug": "nullscape",
+      "role": "worldgen",
+      "purpose": "End terrain (T14)",
+      "version": "1.2.20",
+      "versionId": "lpsdO6Sg",
+      "file": "Nullscape_26.2_v1.2.20.jar",
+      "url": "https://cdn.modrinth.com/data/LPjGiSO4/versions/lpsdO6Sg/Nullscape_26.2_v1.2.20.jar",
+      "sha512": "8c8f5ec050fb038da653c1023d2bbaf01cf0a88354d8081dbf99513375a64ebc18c669650d017c938ab4c4314c47f8b706422d8df43f4652c6c85460a63b6f01",
+      "size": 346840
+    },
+    {
+      "slug": "structory",
+      "role": "worldgen",
+      "purpose": "Overworld structures (T14)",
+      "version": "1.3.17",
+      "versionId": "TUbwu7eG",
+      "file": "Structory_26.2_v1.3.7.jar",
+      "url": "https://cdn.modrinth.com/data/aKCwCJlY/versions/TUbwu7eG/Structory_26.2_v1.3.7.jar",
+      "sha512": "4178a15f32f6ed3d59a7eb2222a8e3f539efd7b54d8ffb790cbf1dfe5c54c6ce6ec33220e148424109c6360c4c6f081b9fbebfe74745fe3c8f05619a06ccb9ec",
+      "size": 1261346
+    },
+    {
+      "slug": "deeper_dark",
+      "role": "dimension",
+      "purpose": "Extra datapack dimension with its own portal (T15)",
+      "version": "4.4.1+mod",
+      "versionId": "GteyPhns",
+      "file": "deeper_dark-4.4.1.jar",
+      "url": "https://cdn.modrinth.com/data/nHr26oc2/versions/GteyPhns/deeper_dark-4.4.1.jar",
+      "sha512": "55191872f2ae1f2214f7cb63bf10b828fb84db7534355ed2e39944555ec2de02d35e2ae88903f2d912ae7f76bda05058bac1f17af637ca689f4484fa3c1bb058",
+      "size": 4614066
+    },
+    {
+      "slug": "multiworld",
+      "role": "dimension",
+      "purpose": "Runtime-created dimensions that must stay EXTERNAL (T15)",
+      "version": "1.14.2",
+      "versionId": "OwgBsqTu",
+      "file": "Multiworld-Fabric-bundle.jar",
+      "url": "https://cdn.modrinth.com/data/fgvoNDL1/versions/OwgBsqTu/Multiworld-Fabric-bundle.jar",
+      "sha512": "4f18e332781d54d9e6cd7b95fd50367060ac60cfde1bc0228aba0ba3556b5ae681a2b31ccc27bdf9dc390c662c29cee5b10eac9f1967f8e67f0cd5bdf9e7cac1",
+      "size": 942833
+    },
+    {
+      "slug": "lithium",
+      "role": "performance",
+      "purpose": "Game logic caches (T18)",
+      "version": "mc26.2-0.25.3-fabric",
+      "versionId": "f7vZ0VWU",
+      "file": "lithium-fabric-0.25.3+mc26.2.jar",
+      "url": "https://cdn.modrinth.com/data/gvQqBUqZ/versions/f7vZ0VWU/lithium-fabric-0.25.3%2Bmc26.2.jar",
+      "sha512": "148b638f3c6229fbaf487120a2344a0af5e411a5aa6533d5db9d75da0a8c0d8304f63eb4cca13f4d03b2c9b4c23d559dd74c1d832422ef8a3087bd005e62a8bd",
+      "size": 912850
+    },
+    {
+      "slug": "c2me-fabric",
+      "role": "performance",
+      "purpose": "Concurrent chunk generation and IO (T09, T18)",
+      "version": "0.4.2-alpha.0.60+26.2",
+      "versionId": "4wjXxrDQ",
+      "file": "c2me-fabric-mc26.2-0.4.2-alpha.0.60.jar",
+      "url": "https://cdn.modrinth.com/data/VSNURh3q/versions/4wjXxrDQ/c2me-fabric-mc26.2-0.4.2-alpha.0.60.jar",
+      "sha512": "079ac7da5de422418a599e0fef1963b3094aa010b057582bc25233fa65bd62a5bea8659c7905eabbd4f6943914d56106c5c6ebe011b022a84583a061a99cc2d4",
+      "size": 3843816
+    },
+    {
+      "slug": "zconfig",
+      "role": "library",
+      "purpose": "Config library required by Fast Noise and Fast Surface",
+      "version": "1.0.0+26.x",
+      "versionId": "tsgt79sG",
+      "file": "zconfig-1.0.0+26.x.jar",
+      "url": "https://cdn.modrinth.com/data/4qmvXRB9/versions/tsgt79sG/zconfig-1.0.0%2B26.x.jar",
+      "sha512": "baf87ac023fd0297f531897f0dcdcac3b0b35960683090adb3350a2281a211c5134a5373730a10628300caf5711b912705f16b33a1d1a73a3a86f346bcd7c6f5",
+      "size": 405423
+    },
+    {
+      "slug": "zfastnoise",
+      "role": "performance",
+      "purpose": "Replaces noise and biome filling in the noise chunk generator (T14 seed parity)",
+      "version": "1.1.1+26.2",
+      "versionId": "WWl1RXk0",
+      "file": "zfastnoise-1.1.1+26.2.jar",
+      "url": "https://cdn.modrinth.com/data/OnlVIpq5/versions/WWl1RXk0/zfastnoise-1.1.1%2B26.2.jar",
+      "sha512": "7e0726688438cd69e9169ad47bbb5334d89fbf74f08d0c883fb2f023c03123db6d78f5181909b19fad034089e87dbb79155da784749709745593e19f79e29f23",
+      "size": 52154
+    },
+    {
+      "slug": "zfastsurface",
+      "role": "performance",
+      "purpose": "Replaces the surface builder (T14 seed parity)",
+      "version": "1.0.0+26.2",
+      "versionId": "j79zOW02",
+      "file": "zfastsurface-1.0.0+26.2.jar",
+      "url": "https://cdn.modrinth.com/data/FRSaEVFk/versions/j79zOW02/zfastsurface-1.0.0%2B26.2.jar",
+      "sha512": "90c098dcc5b286694ab5ebb05643135f0307e60318d6fe84208f71dee42ae56a4689cd84d9a09693904660f48bf3adcd49a4574837c4efc6d3606475dd4cdfd5",
+      "size": 38154
+    },
+    {
+      "slug": "scalablelux",
+      "role": "performance",
+      "purpose": "Threaded lighting engine (T18)",
+      "version": "0.3.0-alpha.0.3+26.2",
+      "versionId": "EKLUURiy",
+      "file": "ScalableLux-fabric-0.3.0-alpha.0.3-all.jar",
+      "url": "https://cdn.modrinth.com/data/Ps1zyz6x/versions/EKLUURiy/ScalableLux-fabric-0.3.0-alpha.0.3-all.jar",
+      "sha512": "ea1551c8728a726f6ee82fed3040af52791943ef99f6b63428ed770797f60677e0160975ad59ad0f51bcd4a4ec2b5da39c6913ab2379f2e25d2397132d469a94",
+      "size": 193030
+    },
+    {
+      "slug": "vmp-fabric",
+      "role": "performance",
+      "purpose": "Entity tracking and chunk sending (T18)",
+      "version": "0.2.0+beta.7.236+26.2",
+      "versionId": "d6FfpWFI",
+      "file": "vmp-fabric-mc26.2-0.2.0+beta.7.236-all.jar",
+      "url": "https://cdn.modrinth.com/data/wnEe9KBa/versions/d6FfpWFI/vmp-fabric-mc26.2-0.2.0%2Bbeta.7.236-all.jar",
+      "sha512": "2e0fd87e66f35f00f634176d4072a6c6d1eee965d1817833709ad3ea73e4f2719fa152d5e95b5ab8216b064c7db124b7f13838ebea87d92f7a72df82839e9bd5",
+      "size": 412247
+    },
+    {
+      "slug": "krypton",
+      "role": "performance",
+      "purpose": "Network stack (client contract)",
+      "version": "0.3.1",
+      "versionId": "5WeL0Nkz",
+      "file": "krypton-0.3.1.jar",
+      "url": "https://cdn.modrinth.com/data/fQEb0iXm/versions/5WeL0Nkz/krypton-0.3.1.jar",
+      "sha512": "b8d9af34cd0050493afb8a6232cb8f785daa9d8887b7045f6e6a53c6bb9b5ffc4318fd9b0347a940eacfeba4773f10cb80ae0be1e79ce4c1888f96eda21e564e",
+      "size": 268842
+    },
+    {
+      "slug": "ferrite-core",
+      "role": "performance",
+      "purpose": "Block state memory",
+      "version": "9.0.0-fabric",
+      "versionId": "d5ddUdiB",
+      "file": "ferritecore-9.0.0-fabric.jar",
+      "url": "https://cdn.modrinth.com/data/uXXizFIs/versions/d5ddUdiB/ferritecore-9.0.0-fabric.jar",
+      "sha512": "d81fa97e11784c19d42f89c2f433831d007603dd7193cee45fa177e4a6a9c52b384b198586e04a0f7f63cd996fed713322578bde9a8db57e1188854ae5cbe584",
+      "size": 72677
+    },
+    {
+      "slug": "spark",
+      "role": "tooling",
+      "purpose": "Profiler holding per-world state (T18)",
+      "version": "1.10.187-fabric",
+      "versionId": "e3hsPc1o",
+      "file": "spark-1.10.187-fabric.jar",
+      "url": "https://cdn.modrinth.com/data/l6YH9Als/versions/e3hsPc1o/spark-1.10.187-fabric.jar",
+      "sha512": "c74bf5d5a16b2445ec6ea717eac756412b272a8015e91f91a7bf5a27e6f2f99c4a11878d434510f941f37b0344b3a7d1ba0dd6c34e80642762c48fb6e9a93894",
+      "size": 3838499
+    },
+    {
+      "slug": "chunky",
+      "role": "tooling",
+      "purpose": "Pregenerator holding per-world tasks (T09, T18)",
+      "version": "1.5.3",
+      "versionId": "4Eotm6ov",
+      "file": "Chunky-Fabric-1.5.3.jar",
+      "url": "https://cdn.modrinth.com/data/fALzjamp/versions/4Eotm6ov/Chunky-Fabric-1.5.3.jar",
+      "sha512": "b83bfe7b218d0aa6232af977ae741dc1f82b10e50cd12bb759f65cf416b8b62beccb543e587ef0b9670abe03815660f8e091bc6823624d65cf07300571573516",
+      "size": 354095
+    }
+  ]
+}

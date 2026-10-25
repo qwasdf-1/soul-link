@@ -1,0 +1,84 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
+}
+
+ext.modArchiveName = project.mod_id
+apply from: rootProject.file('gradle/mod-conventions.gradle')
+
+dependencies {
+    // Soul Link is a game built on the Terra Rasa world-reset library, which ships inside its jar.
+    implementation "dev.terrarasa:terra-rasa:${project.terra_rasa_version}"
+    include "dev.terrarasa:terra-rasa:${project.terra_rasa_version}"
+}
+
+// Real dedicated-server integration testing (shared with Terra Rasa's build).
+apply from: rootProject.file('gradle/integration-server.gradle')
+def integrationServerDirectory = integrationRoot.map { it.dir('server') }
+
+def prepareIntegrationServer = registerServerInstall('prepareIntegrationServer',
+        'Assembles a production-style Fabric dedicated server with the built Soul Link jar.', integrationServerDirectory,
+        tasks.named('jar'))
+
+registerSuite('integrationTest', 'Runs the real dedicated-server integration suite (Python harness in testing/).',
+        integrationServerDirectory, prepareIntegrationServer, [])
+
+// ---------------------------------------------------------------------------------------------
+// Reference modpack: a pinned list of Modrinth mods, downloaded at test time
+// and verified by SHA-512. Nothing is redistributed.
+// ---------------------------------------------------------------------------------------------
+
+def referencePackLock = rootProject.file('modpack/reference-pack.lock.json')
+def referencePackDirectory = integrationRoot.map { it.dir('cache/reference-pack') }
+def modpackServerDirectory = integrationRoot.map { it.dir('server-modpack') }
+
+def downloadReferencePack = tasks.register('downloadReferencePack') {
+    group = 'verification'
+    description = 'Downloads the pinned reference modpack from Modrinth and verifies every file.'
+    def target = referencePackDirectory
+    inputs.file(referencePackLock)
+    outputs.dir(target)
+    doLast {
+        def lock = new groovy.json.JsonSlurper().parse(referencePackLock)
+        def directory = target.get().asFile
+        directory.mkdirs()
+        def wanted = lock.mods.collect { it.file } as Set
+        directory.listFiles().findAll { !wanted.contains(it.name) }.each { it.delete() }
+        lock.mods.each { mod ->
+            def file = new File(directory, mod.file)
+            if (file.isFile() && sha512(file) == mod.sha512) {
+                return
+            }
+            def partial = new File(directory, mod.file + '.part')
+            def connection = new URI(mod.url).toURL().openConnection()
+            // Modrinth asks API clients to identify themselves; no personal data is sent.
+            connection.setRequestProperty('User-Agent', 'soullink-integration-tests')
+            connection.inputStream.withStream { input -> partial.withOutputStream { it << input } }
+            if (sha512(partial) != mod.sha512) {
+                partial.delete()
+                throw new GradleException("SHA-512 mismatch for ${mod.file} from ${mod.url}")
+            }
+            if (!partial.renameTo(file)) {
+                throw new GradleException("Could not move ${partial} to ${file}")
+            }
+        }
+    }
+}
+
+def prepareModpackServer = registerServerInstall('prepareModpackServer',
+        'Assembles the integration server with the reference modpack installed.', modpackServerDirectory,
+        files(tasks.named('jar'), files(referencePackDirectory).builtBy(downloadReferencePack)))
+
+registerSuite('modpackTest', 'Runs the reference modpack compatibility suite on a real server.',
+        modpackServerDirectory, prepareModpackServer, ['-m', 'modpack', 'tests/modpack'])
+
+static String sha512(File file) {
+    def digest = java.security.MessageDigest.getInstance('SHA-512')
+    file.withInputStream { input ->
+        byte[] buffer = new byte[1 << 16]
+        int read
+        while ((read = input.read(buffer)) > 0) {
+            digest.update(buffer, 0, read)
+        }
+    }
+    return digest.digest().encodeHex().toString()
+}

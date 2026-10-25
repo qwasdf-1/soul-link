@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "soullink",
+  "version": "${version}",
+  "name": "Soul Link",
+  "description": "Cooperative Soul Link speedruns on canonical, freshly seeded run dimensions with a persistent lobby.",
+  "authors": ["Soul Link Contributors"],
+  "license": "Apache-2.0",
+  "contact": {
+    "sources": "https://github.com/qwasdf-1/soul-link",
+    "issues": "https://github.com/qwasdf-1/soul-link/issues"
+  },
+  "environment": "server",
+  "entrypoints": {
+    "main": ["dev.soullink.SoulLinkInitializer"]
+  },
+  "mixins": ["soullink.mixins.json"],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "minecraft": "${minecraft_version}",
+    "java": ">=${java_version}",
+    "fabric-api": "*",
+    "terrarasa": ">=${terra_rasa_version}"
+  }
+}
