@@ -1,20 +1,20 @@
-# Soul Link Reference
+# Operations and compatibility reference
 
-What a reset covers, what Soul Link costs a server, how a run survives restarts, and what the compatibility suite checks. The numbers come from the integration suites on a development machine; the tests that assert them are named in each section.
+This reference covers session reset behavior, server costs, restart recovery, and the tested compatibility stack. Performance numbers are measurements from the integration suites on a development machine, not universal hardware guarantees.
 
-## What a reset covers
+## Session reset
 
 Reset on live objects at every activation: scoreboard objectives, display slots and teams; command storage; custom boss bars; scheduled functions; random sequences; weather; world clocks; the wandering-trader timer. Then `#minecraft:load` runs again, so data packs set themselves up as in a new world.
 
-Per player: inventory, ender chest, XP, health, food, saturation, absorption, fire, freeze, air, effects, attribute modifiers, entity tags, respawn point, last death location, game mode, recipes, advancements, statistics, scores, ender pearls and vehicles. A player who was offline during a reset is reset when they rejoin.
+Per player: inventory, ender chest, XP, health, food, saturation, absorption, fire, freeze, air, effects, attribute modifiers, entity tags, respawn point, last death location, game mode, recipes, advancements, statistics, scores, and ender pearls. Players are dismounted and passengers ejected. A player who was offline during a reset is reset when they rejoin.
 
-Deliberately kept: game rules, difficulty, ops and whitelist, and Soul Link's lobby and state. Not reset yet: map item data and stopwatches.
+Deliberately kept: game rules, difficulty, ops and whitelist, and Soul Link's lobby and state. Map item data is not reset; host or mod state outside vanilla's saved world and player data must be handled separately.
 
 ## Measured costs
 
 ### Idle
 
-With a run in progress and nothing being prepared or swapped, Soul Link's own work per server tick (`/soullink status` → `tickCost.idle`, over 1,200 ticks) is about 20 µs on average, 8–10 µs at the median and about 120 µs at p99, against a 50 ms tick budget. `test_10_performance` fails above a 50 µs mean or a 500 µs p99.
+With a run in progress and nothing being prepared or swapped, Soul Link's own work per server tick (`/soullink status` → `tickCost.idle`, over 1,200 ticks) is about 20 µs on average, 8–10 µs at the median and about 120 µs at p99, against a 50 ms tick budget. The integration suite treats a 50 µs mean or 500 µs p99 as the upper bound.
 
 | Work | Average cost per tick |
 |---|---|
@@ -42,16 +42,16 @@ Soul Link's worst server-thread step in any phase is about 15 ms, and preparatio
 | Finding the spawn | 7–25 ms |
 | Preloading the spawn area | 3–29 ms |
 
-While the prepared worlds are flushed, ticks measure up to about 50 ms. That is not lag: vanilla unloads released chunks in a tick's spare time, up to the deadline of the next tick, exactly as when players leave terrain.
+While the prepared worlds are flushed, ticks measure up to about 50 ms. Vanilla unloads released chunks in the tick's spare time, as it does when players leave terrain.
 
 ### Pregeneration
 
-Soul Link's defaults pregenerate 500 blocks around the run spawn in the Overworld, 96 in the Nether and 160 around the End's main island: 3,639 chunks. `test_14_pregeneration` measures it with two clients online, a run in progress and the reference modpack's worldgen mods:
+Soul Link's defaults pregenerate 500 blocks around the run spawn in the Overworld, 96 in the Nether and 160 around the End's main island: 3,639 chunks. The measurements below used two clients online, a run in progress, and the reference modpack's world-generation mods:
 
 | | Measured |
 |---|---|
 | Full default area | 171–192 s over four runs (19–21 chunks/s) |
-| Worst server tick while pregenerating | under 60 ms (asserted) |
+| Worst server tick while pregenerating | under 60 ms |
 | Worst 5 s window of server ticks, pregeneration running both live and for the next run (P50, P95, P99) | 4.1, 14.1, 44.7 ms |
 | `/start` or `/reset` issued mid-pregeneration: players waited | 3.5–4.4 s |
 
@@ -65,15 +65,15 @@ Give the server at least 4 GB of heap with pregeneration on. The figures above a
 
 ### Longevity
 
-No retired level stays reachable after garbage collection across repeated resets, with or without the modpack. Over 100 reset cycles with two connected clients (`-m slow`), the mean swap took 1,232 ms over the first 10 cycles and 1,308 ms over the last 10, each client logged in once for the whole run, and the heap after GC went from 334 to 406 MiB.
+No retired level stays reachable after garbage collection across repeated resets, with or without the modpack. Over 100 reset cycles with two connected clients, the mean swap took 1,232 ms over the first 10 cycles and 1,308 ms over the last 10, each client logged in once for the whole run, and the heap after GC went from 334 to 406 MiB.
 
 ## Restarts and crashes
 
-The run worlds are ordinary vanilla dimensions, so vanilla saves the terrain and every player's own state: position, dimension, inventory, effects and health. Soul Link saves the rest to `<world>/soullink/state.json`: the run and its seed, the timer, the shared health and food pool, the rules of this run and the next, the participants, and the result of an ended run. Terra Rasa keeps the prepared next run under `<world>/terrarasa/`. `test_11_persistence` covers each case:
+The run worlds are ordinary vanilla dimensions, so vanilla saves the terrain and every player's own state: position, dimension, inventory, effects and health. Soul Link saves the rest to `<world>/soullink/state.json`: the run and its seed, the timer, the shared health and food pool, the rules of this run and the next, the participants, and the result of an ended run. Terra Rasa keeps the prepared next run under `<world>/terrarasa/`. Integration coverage includes each case:
 
 - **Graceful stop and restart.** The run resumes exactly where it stopped: same run, seed, rules, shared pool, positions, dimensions, inventories and effects. Shared damage still links the players. The prepared next run is adopted from disk, not generated again.
 - **Hard kill.** The run resumes from its last state save, losing at most 5 s of timer. Participants come back into the run in survival, not into the lobby. A crash in the middle of a swap is reconciled by Terra Rasa's journal at the next startup.
-- **Restart during preparation.** The half-prepared run is deleted at startup and preparation starts over.
+- **Restart during preparation.** The incomplete staged run is deleted at startup. With `autoPrepare` enabled, preparation starts again in the background; otherwise the next `/start` begins it.
 - **Ended run.** It stays ended across a restart, with its result. The next `/start` works normally.
 
 The run timer only counts while a participant is online, so an empty server does not use up a run's time.

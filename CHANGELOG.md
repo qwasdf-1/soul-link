@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Expand the player, operator, and configuration documentation, including the available run rules and restart behavior.
+
 ## 0.1.0
 
 The first public release, for Minecraft 26.2 on Fabric, built on Terra Rasa 0.1.0.
