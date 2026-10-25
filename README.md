@@ -1,6 +1,6 @@
 # Soul Link
 
-Cooperative Soul Link challenge runs for a Fabric dedicated server, inspired by the Soul Link format and similar co-op challenges. Players share health, hunger, and saturation; any participant's death ends the run, and defeating the Ender Dragon wins.
+Cooperative challenge runs for a Fabric dedicated server, inspired by the Soul Link format and similar co-op challenges. Players share health, hunger, and saturation; any participant's death ends the run, and defeating the Ender Dragon wins.
 
 Each run uses fresh, seeded Overworld, Nether, and End worlds while players stay connected in a persistent lobby. [Terra Rasa](https://github.com/qwasdf-1/terra-rasa) handles world preparation and replacement and is bundled in Soul Link's mod jar. Its [README](https://github.com/qwasdf-1/terra-rasa#terra-rasa) explains how canonical replacement keeps vanilla's world behavior intact.
 
