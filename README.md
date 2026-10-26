@@ -24,8 +24,22 @@ Build the mod with a Terra Rasa checkout next to this repository:
 ```sh
 git clone https://github.com/qwasdf-1/terra-rasa.git
 git clone https://github.com/qwasdf-1/soul-link.git
-cd soul-link
+cd terra-rasa
+./gradlew publishToMavenLocal
+cd ../soul-link
 ./gradlew build
+```
+
+The build uses the matching Terra Rasa artifact from Maven Local. To build a non-default game target, pass the matching Loom, Minecraft, Fabric Loader, Fabric API, and Java values from [`gradle/minecraft-targets.json`](gradle/minecraft-targets.json) to both projects.
+
+For example, to build the library for Minecraft 1.21.11 before building Soul Link:
+
+```sh
+# Run these commands from the parent directory containing both checkouts.
+cd terra-rasa
+./gradlew publishToMavenLocal -Ploom_version=1.17.21 -Pminecraft_version=1.21.11 -Pfabric_loader_version=0.19.5 -Pfabric_api_version=0.141.6+1.21.11 -Pjava_version=21
+cd ../soul-link
+./gradlew build -Ploom_version=1.17.21 -Pminecraft_version=1.21.11 -Pfabric_loader_version=0.19.5 -Pfabric_api_version=0.141.6+1.21.11 -Pjava_version=21
 ```
 
 Place the jar matching the server version, named `build/libs/soullink-mc<game-version>-<mod-version>.jar`, and Fabric API in the dedicated server's `mods/` directory. For example, use `soullink-mc1.21.11-<mod-version>.jar` on 1.21.11 or `soullink-mc26.2-<mod-version>.jar` on 26.2. Terra Rasa is bundled; the lobby dimension and its platform are included, so no extra datapack or world setup is required.

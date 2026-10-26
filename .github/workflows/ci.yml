@@ -46,6 +46,16 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
+      - name: Build and publish Terra Rasa for Minecraft ${{ matrix.minecraft_version }}
+        working-directory: terra-rasa
+        run: >-
+          ./gradlew publishToMavenLocal
+          -Ploom_version=${{ matrix.loom_version }}
+          -Pminecraft_version=${{ matrix.minecraft_version }}
+          -Pfabric_loader_version=${{ matrix.fabric_loader_version }}
+          -Pfabric_api_version=${{ matrix.fabric_api_version }}
+          -Pjava_version=${{ matrix.java_version }}
+
       - name: Build and unit tests for Minecraft ${{ matrix.minecraft_version }}
         run: >-
           ./gradlew build
@@ -87,6 +97,16 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
+
+      - name: Build and publish Terra Rasa for Minecraft ${{ matrix.minecraft_version }}
+        working-directory: terra-rasa
+        run: >-
+          ./gradlew publishToMavenLocal
+          -Ploom_version=${{ matrix.loom_version }}
+          -Pminecraft_version=${{ matrix.minecraft_version }}
+          -Pfabric_loader_version=${{ matrix.fabric_loader_version }}
+          -Pfabric_api_version=${{ matrix.fabric_api_version }}
+          -Pjava_version=${{ matrix.java_version }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
