@@ -131,7 +131,7 @@ jobs:
             --arg minecraft "$MINECRAFT" \
             --arg fabric "$FABRIC_API_ID" \
             --arg terrarasa "$TERRARASA_ID" \
-            '{name:$name, version_number:$version, changelog:$changelog, dependencies:[{project_id:$fabric,dependency_type:"required"},{project_id:$terrarasa,dependency_type:"embedded"}], game_versions:[$minecraft], version_type:"release", loaders:["fabric"], environment:"dedicated_server_only", status:"listed", project_id:$project, file_parts:["modfile"], primary_file:"modfile"}' \
+            '{name:$name, version_number:$version, changelog:$changelog, dependencies:[{project_id:$fabric,dependency_type:"required"},{project_id:$terrarasa,dependency_type:"embedded"}], game_versions:[$minecraft], version_type:"release", loaders:["fabric"], environment:"dedicated_server_only", featured:false, status:"listed", project_id:$project, file_parts:["modfile"], primary_file:"modfile"}' \
             > "$RUNNER_TEMP/modrinth-version.json"
           response_file="$RUNNER_TEMP/modrinth-response.json"
           if ! http_status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
