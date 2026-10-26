@@ -4,16 +4,16 @@ Thanks for helping improve Soul Link. The world swapping lives in [Terra Rasa](h
 
 ## Build And Test
 
-You need Java 25 and a Terra Rasa checkout next to this repository, as `../terra-rasa`. The integration suites also need [uv](https://docs.astral.sh/uv/), which installs Python 3.14 for them.
+You need Java 21 for Minecraft 1.21.11 and Java 25 for the 26.x targets, plus a Terra Rasa checkout next to this repository at `../terra-rasa`. The integration suites also need [uv](https://docs.astral.sh/uv/), which installs Python 3.14 for them. Target toolchains are listed in [`gradle/minecraft-targets.json`](gradle/minecraft-targets.json).
 
 ```sh
-./gradlew build             # mod and JUnit tests, built against ../terra-rasa
-./gradlew integrationTest   # real dedicated-server suite, about 25 minutes
-./gradlew modpackTest       # the same harness with the reference modpack, about 7 minutes
+./gradlew build             # default target is 26.2; CI builds and tests all supported targets
+./gradlew integrationTest   # real dedicated-server suite
+./gradlew modpackTest       # reference modpack suite, currently pinned to 26.2
 ./gradlew integrationTest -Ppytest.args="-s tests/test_02_gameplay.py"   # one module
 ```
 
-CI runs `./gradlew build` on every push and pull request; both server suites run on manual dispatch. Run them locally before opening a pull request that changes gameplay or the run lifecycle.
+CI runs the build and unit tests for all six targets on every push and pull request. The dedicated-server suite runs for each target on manual dispatch; the reference modpack suite is pinned to 26.2. Run the relevant server suite locally before opening a pull request that changes gameplay or the run lifecycle.
 
 ## Changes
 

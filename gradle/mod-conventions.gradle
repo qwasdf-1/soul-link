@@ -3,6 +3,7 @@
 
 def javaVersion = rootProject.java_version.toInteger()
 def minecraftVersion = rootProject.minecraft_version
+def minecraftFamily = minecraftVersion.startsWith('1.') ? 'legacy' : 'modern'
 
 group = rootProject.maven_group
 version = rootProject.mod_version
@@ -16,10 +17,16 @@ repositories {
     mavenLocal()
 }
 
+sourceSets.main.java.srcDir(rootProject.file("src/versions/${minecraftFamily}/java"))
+sourceSets.main.resources.srcDir(rootProject.file("src/versions/${minecraftFamily}/resources"))
+
 dependencies {
     minecraft "com.mojang:minecraft:${minecraftVersion}"
-    implementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
-    implementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
+    def modConfiguration = minecraftFamily == 'legacy' ? 'modImplementation' : 'implementation'
+    add(modConfiguration, "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}")
+    add(modConfiguration, "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}")
+    add(modConfiguration, "dev.terrarasa:terra-rasa-mc${minecraftVersion}:${rootProject.terra_rasa_version}")
+    include "dev.terrarasa:terra-rasa-mc${minecraftVersion}:${rootProject.terra_rasa_version}"
 
     testImplementation platform('org.junit:junit-bom:5.12.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -32,7 +39,8 @@ processResources {
         minecraft_version: minecraftVersion,
         loader_version: rootProject.fabric_loader_version,
         java_version: javaVersion.toString(),
-        terra_rasa_version: rootProject.terra_rasa_version
+        terra_rasa_version: rootProject.terra_rasa_version,
+        mixins_config: minecraftFamily == 'legacy' ? 'soullink-legacy.mixins.json' : 'soullink-modern.mixins.json'
     ]
     inputs.properties expandedValues
     filesMatching('fabric.mod.json') {

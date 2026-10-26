@@ -11,10 +11,19 @@ pluginManagement {
 
 rootProject.name = 'soullink'
 
-// Soul Link is built on the Terra Rasa world-reset library (dev.terrarasa:terra-rasa). A checkout next
-// to this one (../terra-rasa) replaces the published artifact, so both can be changed and tested
-// together; pass -PterraRasaPath=<dir> to use another checkout, or -PterraRasaPath= to use the artifact.
-def terraRasa = file(providers.gradleProperty('terraRasaPath').getOrElse('../terra-rasa'))
-if (terraRasa.path && new File(terraRasa, 'settings.gradle').isFile()) {
-    includeBuild(terraRasa)
+// Soul Link uses the matching Terra Rasa artifact (dev.terrarasa:terra-rasa-mc<version>). A checkout
+// next to this one (../terra-rasa) replaces that artifact, so both can be changed and tested together;
+// pass -PterraRasaPath=<dir> to use another checkout, or -PterraRasaPath= to use the published artifact.
+def terraRasaPath = providers.gradleProperty('terraRasaPath').getOrElse('../terra-rasa').trim()
+def minecraftVersion = providers.gradleProperty('minecraft_version').getOrElse('26.2')
+if (terraRasaPath) {
+    def terraRasa = file(terraRasaPath)
+    if (!new File(terraRasa, 'settings.gradle').isFile()) {
+        throw new GradleException("Terra Rasa checkout not found at ${terraRasa}; set -PterraRasaPath= to use the published target artifact")
+    }
+    includeBuild(terraRasa) {
+        dependencySubstitution {
+            substitute module("dev.terrarasa:terra-rasa-mc${minecraftVersion}") using project(':')
+        }
+    }
 }

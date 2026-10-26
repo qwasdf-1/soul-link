@@ -16,6 +16,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import dev.soullink.SoulLink;
 import dev.soullink.SoulLinkConfig;
+import dev.soullink.MinecraftCompat;
 import dev.soullink.game.SharedEffects;
 import dev.soullink.game.SharedVitality;
 import dev.soullink.lobby.LobbyService;
@@ -731,7 +732,7 @@ public final class RunCoordinator {
         json.addProperty("activeRunId", this.state.activeRunId);
         json.addProperty("activeRunStarted", this.state.activeRunStarted);
         json.addProperty("runSeed", this.state.seed);
-        json.addProperty("globalSeed", this.server.getWorldGenSettings().options().seed());
+        json.addProperty("globalSeed", MinecraftCompat.globalSeed(this.server));
         json.addProperty("overworldSeed", this.server.overworld().getSeed());
         JsonArray spawn = new JsonArray();
         spawn.add(this.state.spawnX);

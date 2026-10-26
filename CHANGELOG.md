@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add builds for Minecraft 1.21.11 and 26.1 through 26.3, with one release jar per game version.
 - Expand the player, operator, and configuration documentation, including the available run rules and restart behavior.
 
 ## 0.1.0

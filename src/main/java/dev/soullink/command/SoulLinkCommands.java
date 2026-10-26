@@ -13,6 +13,7 @@ import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import dev.soullink.mixin.EnderDragonFightAccessor;
+import dev.soullink.MinecraftCompat;
 import dev.soullink.run.RunCoordinator;
 import dev.terrarasa.FaultInjection;
 import dev.terrarasa.Json;
@@ -36,7 +37,6 @@ import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.enderdragon.phases.EnderDragonPhase;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.dimension.end.EnderDragonFight;
 
 /** Player commands match Soul Link Speedrun's; {@code /soullink} holds operator and diagnostic commands. */
 public final class SoulLinkCommands {
@@ -148,7 +148,7 @@ public final class SoulLinkCommands {
     private static JsonObject describeEnd(MinecraftServer server) {
         JsonObject json = new JsonObject();
         ServerLevel end = server.getLevel(Level.END);
-        EnderDragonFight fight = end != null ? end.getDragonFight() : null;
+        Object fight = end != null ? end.getDragonFight() : null;
         if (fight == null) {
             return json;
         }
@@ -166,7 +166,7 @@ public final class SoulLinkCommands {
         }
         json.addProperty("dragonKilled", accessor.soullink$dragonKilled());
         json.addProperty("previouslyKilled", accessor.soullink$previouslyKilled());
-        json.addProperty("aliveCrystals", fight.aliveCrystals());
+        json.addProperty("aliveCrystals", MinecraftCompat.aliveDragonCrystals(fight));
         ServerBossEvent bar = accessor.soullink$bossBar();
         JsonObject bossBar = new JsonObject();
         bossBar.addProperty("visible", bar.isVisible());
@@ -237,7 +237,7 @@ public final class SoulLinkCommands {
         json.addProperty("absorption", player.getAbsorptionAmount());
         json.addProperty("seenCredits", player.seenCredits);
         JsonArray tags = new JsonArray();
-        player.entityTags().forEach(tags::add);
+        MinecraftCompat.entityTags(player).forEach(tags::add);
         json.add("tags", tags);
         int done = 0;
         for (var holder : server.getAdvancements().getAllAdvancements()) {

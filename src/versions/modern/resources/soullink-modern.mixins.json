@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "package": "dev.soullink.mixin",
+  "mixins": [
+    "EnderDragonFightAccessor",
+    "EnderDragonFightMixin",
+    "ServerPlayerEffectsMixin",
+    "StatsCounterAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

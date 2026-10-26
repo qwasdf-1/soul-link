@@ -1,14 +1,23 @@
 plugins {
-    id 'net.fabricmc.fabric-loom' version "${loom_version}"
+    // Minecraft 1.21.11 remains obfuscated; Minecraft 26.1+ uses the unobfuscated game jars.
+    id 'net.fabricmc.fabric-loom' version "${loom_version}" apply false
+    id 'net.fabricmc.fabric-loom-remap' version "${loom_version}" apply false
+}
+
+def obfuscatedMinecraft = project.minecraft_version.startsWith('1.')
+apply plugin: obfuscatedMinecraft ? 'net.fabricmc.fabric-loom-remap' : 'net.fabricmc.fabric-loom'
+
+if (obfuscatedMinecraft) {
+    dependencies {
+        mappings loom.officialMojangMappings()
+    }
 }
 
 ext.modArchiveName = project.mod_id
 apply from: rootProject.file('gradle/mod-conventions.gradle')
 
 dependencies {
-    // Soul Link is a game built on the Terra Rasa world-reset library, which ships inside its jar.
-    implementation "dev.terrarasa:terra-rasa:${project.terra_rasa_version}"
-    include "dev.terrarasa:terra-rasa:${project.terra_rasa_version}"
+    // Terra Rasa is declared per target in gradle/mod-conventions.gradle and bundled into the mod jar.
 }
 
 // Real dedicated-server integration testing (shared with Terra Rasa's build).

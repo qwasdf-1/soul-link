@@ -17,7 +17,7 @@ Each run uses fresh, seeded Overworld, Nether, and End worlds while players stay
 
 ## Requirements and installation
 
-Minecraft **26.2** (exact), Java 25, Fabric Loader 0.19.5, Fabric API 0.161.0+26.2, and Gradle 9.7.1 to build from source.
+Supported game versions are **1.21.11**, **26.1**, **26.1.1**, **26.1.2**, **26.2**, and **26.3**. Minecraft 1.21.11 builds with Java 21; the 26.x versions build with Java 25. Each target's Fabric Loader, Fabric API, Loom, and Java versions are pinned in [`gradle/minecraft-targets.json`](gradle/minecraft-targets.json). Gradle 9.7.1 is required to build from source.
 
 Build the mod with a Terra Rasa checkout next to this repository:
 
@@ -28,7 +28,7 @@ cd soul-link
 ./gradlew build
 ```
 
-Place `build/libs/soullink-mc26.2-<version>.jar` and Fabric API in the dedicated server's `mods/` directory. Terra Rasa is bundled; the lobby dimension and its platform are included, so no extra datapack or world setup is required.
+Place the jar matching the server version, named `build/libs/soullink-mc<game-version>-<mod-version>.jar`, and Fabric API in the dedicated server's `mods/` directory. For example, use `soullink-mc1.21.11-<mod-version>.jar` on 1.21.11 or `soullink-mc26.2-<mod-version>.jar` on 26.2. Terra Rasa is bundled; the lobby dimension and its platform are included, so no extra datapack or world setup is required.
 
 By default, Soul Link replaces the vanilla Overworld, Nether, and End. The lobby and any dimension not listed for replacement remain untouched. Mod or datapack dimensions used by the run can be added in `config/soullink.json`; details are in the [configuration guide](docs/configuration.md).
 
