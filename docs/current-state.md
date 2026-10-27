@@ -9,9 +9,10 @@ toolchain versions live in `gradle/minecraft-targets.json`.
   outcomes, late-join handling, and restart recovery.
 - Persistent lobby, asynchronous preparation, optional pregeneration, and
   replacement of configured canonical dimensions through bundled Terra Rasa.
-- The lobby platform currently has a polished-blackstone edge, its platform
-  chunks are kept loaded by a small ticket, and a server tick check rescues lobby
-  players below Y=0 every five ticks.
+- The lobby platform has a polished-blackstone edge and a two-block-high
+  barrier perimeter just outside it. Void damage immediately returns players
+  to spawn; a five-second server tick check is the backstop. Its platform chunks
+  remain loaded by a small ticket.
 - A new server automatically starts its first run when the prepared spawn is
   ready; later runs still require `/soullink start`.
 - `/soullink help`, a consolidated command root with the old top-level aliases removed, readable
@@ -22,6 +23,8 @@ toolchain versions live in `gradle/minecraft-targets.json`.
   natural-regeneration game rule.
 - FIFO queue of up to three durable prepared future runs, configured with
   `/soullink setup pool <futureRuns>`; the active run is not counted.
+- Player-facing notices announce the world swap before activation and the new
+  run after players arrive.
 - Optional half-heart mode with restoration of participant max-health base
   values, plus operator timer pause/resume commands (world simulation continues).
 - Per-target source overlays for the obfuscated 1.21.11 line and the modern
@@ -67,14 +70,19 @@ The post-run `/soullink start` destination question and live confirmation of
 half-heart composition remain open in `roadmap.md`. The new command, onboarding,
 damage, timeout, and progress behavior still need server verification.
 
-The chosen lobby-safety follow-up is a barrier perimeter, void-damage rescue,
-and a slow periodic rescue backstop. It is not implemented yet.
+The lobby barrier, immediate void-damage rescue, and five-second periodic
+backstop are implemented. The integration suite covers all four perimeter
+sides and both rescue paths.
 
 Whole-lobby unloading and freezing ended dimensions are not implemented.
 The lobby remains a server dimension for transitions. Victory worlds remain
-playable so vanilla portal and credits behavior works. The desired defeat
-behavior is to stop world simulation while keeping spectator movement; the
-implementation needs to establish whether that can be done without disabling
-player ticks. A 26.2 two-client comparison showed no loaded-chunk or measurable
-tick-time reduction when Soul Link's lobby ticket was disabled; keep the ticket
-for now because its explicit platform-load guarantee remains useful.
+playable so vanilla portal and credits behavior works. Defeat freezing is
+deferred: in both the 1.21.11 and 26.2 server implementations, `ServerLevel.tick`
+drives the entity tick list (including players), chunk ticking, scheduled block
+and fluid ticks, and block entities. Skipping that method would stop spectator
+movement too; selectively pausing world simulation while preserving player and
+mod behavior requires deeper, cross-version hooks that are not safe to ship
+without broader compatibility testing. A 26.2 two-client comparison showed no
+loaded-chunk or measurable tick-time reduction when Soul Link's lobby ticket
+was disabled; keep the ticket because its explicit platform-load guarantee
+remains useful.

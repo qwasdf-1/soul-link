@@ -27,6 +27,8 @@ public final class LobbyService {
             Identifier.fromNamespaceAndPath(SoulLink.MOD_ID, "lobby"), new TicketType(0L, TicketType.FLAG_LOADING));
     private static final int PLATFORM_Y = 64;
     private static final int PLATFORM_RADIUS = 6;
+    private static final int BARRIER_RADIUS = PLATFORM_RADIUS + 1;
+    private static final int BARRIER_HEIGHT = 2;
     public static final Vec3 SPAWN = new Vec3(0.5, PLATFORM_Y + 1, 0.5);
 
     private LobbyService() {
@@ -53,6 +55,28 @@ public final class LobbyService {
                             (edge ? Blocks.POLISHED_BLACKSTONE : Blocks.SMOOTH_STONE).defaultBlockState());
                 }
             }
+        }
+        buildBarrierPerimeter(lobby);
+    }
+
+    /** Two blocks high, just beyond the platform edge, to catch routine walks off the platform. */
+    private static void buildBarrierPerimeter(ServerLevel lobby) {
+        for (int y = PLATFORM_Y + 1; y <= PLATFORM_Y + BARRIER_HEIGHT; y++) {
+            for (int offset = -BARRIER_RADIUS; offset <= BARRIER_RADIUS; offset++) {
+                placeBarrier(lobby, -BARRIER_RADIUS, y, offset);
+                placeBarrier(lobby, BARRIER_RADIUS, y, offset);
+                if (offset != -BARRIER_RADIUS && offset != BARRIER_RADIUS) {
+                    placeBarrier(lobby, offset, y, -BARRIER_RADIUS);
+                    placeBarrier(lobby, offset, y, BARRIER_RADIUS);
+                }
+            }
+        }
+    }
+
+    private static void placeBarrier(ServerLevel lobby, int x, int y, int z) {
+        BlockPos pos = new BlockPos(x, y, z);
+        if (!lobby.getBlockState(pos).is(Blocks.BARRIER)) {
+            lobby.setBlockAndUpdate(pos, Blocks.BARRIER.defaultBlockState());
         }
     }
 

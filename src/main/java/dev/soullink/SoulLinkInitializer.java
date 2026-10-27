@@ -79,7 +79,8 @@ public final class SoulLinkInitializer implements ModInitializer {
         });
         ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
             RunCoordinator coordinator = RunCoordinator.active();
-            return !(entity instanceof ServerPlayer player && coordinator != null && coordinator.isLobbyProtected(player));
+            return !(entity instanceof ServerPlayer player && coordinator != null
+                    && coordinator.shouldCancelLobbyDamage(player, source));
         });
         ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
             RunCoordinator coordinator = RunCoordinator.active();

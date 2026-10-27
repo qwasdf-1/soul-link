@@ -68,17 +68,13 @@ This document tracks requested Soul Link improvements and their implementation s
 
 ### Chosen lobby recovery behavior
 
-- Add a barrier perimeter around the lobby platform to prevent ordinary falls.
-- Keep a low-frequency rescue backstop that teleports lobby players below the
-  platform back to spawn after unusual movement or future platform changes. Do
-  not rely on players falling forever.
-- Rescue a player when the void-damage event occurs, with lobby damage
-  protection adjusted so this rescue is not canceled.
-- This is a design choice; implementation and rendered-client verification are
-  still pending. Current code builds the platform with a polished-blackstone
-  edge and rescues lobby players below Y=0 every five server ticks.
-- The periodic backstop should run much less often than the current five-tick
-  check; choose its cadence during rendered-client verification.
+- [x] Add a two-block-high barrier perimeter just outside the lobby platform.
+- [x] Rescue players immediately when void damage occurs, while still
+  canceling lobby damage.
+- [x] Keep a five-second rescue backstop for falls caused by unusual movement
+  or future platform changes; do not rely on players falling forever.
+- [x] Cover all four barrier sides, void-damage rescue, and the periodic
+  backstop in the real-server integration suite.
 
 ### Open performance questions
 
@@ -89,9 +85,11 @@ This document tracks requested Soul Link improvements and their implementation s
   Retain the ticket; the source of the loaded chunks without it is still unknown.
 - Ended dimensions currently continue normal gameplay until the next world
   replacement. Keep post-victory exploration and vanilla exit portal/credits
-  behavior. After defeat, the desired behavior is to stop world simulation
-  while allowing spectators to fly; establish whether selective simulation
-  pausing preserves player ticks and mod safety before implementation.
+  behavior. Defeat freezing is deferred while spectators remain in the run:
+  `ServerLevel.tick` drives player entity movement as well as chunks, scheduled
+  block/fluid ticks, and block entities in both 1.21.11 and 26.2. Skipping the
+  level tick would strand spectators; selectively pausing other simulation
+  needs deeper cross-version hooks and broader mod compatibility proof.
 
 ## Run transition feedback
 
@@ -99,10 +97,10 @@ This document tracks requested Soul Link improvements and their implementation s
   promotes prepared world data, reconstructs and validates the new dimensions,
   then sends players into the new run. This is a synchronous server-thread
   operation; the server cannot process ordinary game ticks during activation.
-- Add clear player-facing status before the blocking part and after the new run
-  is ready. Current operator logs already include phase timings. A separate
-  message for every internal phase may not be visible until the blocked server
-  thread resumes, so validate client delivery before promising live progress.
+- [x] Broadcast a clear player-facing notice before world activation and a
+  separate notice after the new run is ready. Detailed phase notices remain
+  unsuitable inside the blocking activation because the server cannot process
+  ordinary game ticks until it finishes.
 - The operations reference records the paired measurement and its limits. The
   26.2 two-client probe measured Soul Link idle work at about 15.8 microseconds
   mean and 112 microseconds p99; treat it as a local baseline, not a guarantee
