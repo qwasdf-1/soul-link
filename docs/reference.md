@@ -14,11 +14,11 @@ Deliberately kept: game rules, difficulty, ops and whitelist, and Soul Link's lo
 
 ### Idle
 
-With a run in progress and nothing being prepared or swapped, Soul Link's own work per server tick (`/soullink debug lifecycle` → `tickCost.idle`, over 1,200 ticks) is about 20 µs on average, 8–10 µs at the median and about 120 µs at p99, against a 50 ms tick budget. The integration suite treats a 50 µs mean or 500 µs p99 as the upper bound.
+With a run in progress and nothing being prepared or swapped, an earlier measurement of Soul Link's own work per server tick (`/soullink debug lifecycle` → `tickCost.idle`, over 1,200 ticks) was about 20 µs on average, 8–10 µs at the median and about 120 µs at p99, against a 50 ms tick budget. That baseline predates the 0.1-second timer refresh below and should not be treated as a current cost measurement. The integration suite treats a 50 µs mean or 500 µs p99 as the upper bound.
 
 | Work | Average cost per tick |
 |---|---|
-| Run timer on the action bar, every 10 ticks (formatting plus one packet per player) | about 7 µs (about 70 µs on the ticks that send it; this is the p99) |
+| Run timer on the action bar, every 2 ticks (0.1 seconds; formatting plus one packet per player) | Current cost not yet isolated; the older 7 µs average / 70 µs send-tick measurement used a 10-tick refresh interval |
 | Shared health and food: finding the active participants and comparing them with the pool | about 8 µs |
 | Run clock and online-participant lookup | about 5 µs |
 | Lobby fall rescue, every 5 ticks | about 1 µs |

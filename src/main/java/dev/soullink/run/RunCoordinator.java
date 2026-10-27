@@ -71,6 +71,7 @@ public final class RunCoordinator {
     private static final String LOBBY_STAMP = "lobby";
     private static final int PREPARE_RETRY_TICKS = 20 * 30;
     private static final int STATE_SAVE_INTERVAL_TICKS = 20 * 5;
+    private static final int TIMER_DISPLAY_INTERVAL_TICKS = 2;
     private static final int LOBBY_RESCUE_INTERVAL_TICKS = 20 * 5;
     private static final int PREPARATION_NOTICE_INTERVAL_TICKS = 20 * 30;
 
@@ -267,17 +268,19 @@ public final class RunCoordinator {
             this.state.elapsedTicks++;
         }
         List<ServerPlayer> participants = activeParticipants();
-        if (this.vitality.tick(participants)) {
-            endRun(SoulLinkState.Result.DEFEAT, "the shared soul ran out of health");
-            for (ServerPlayer player : participants) {
-                player.kill(player.level());
+        if (this.state.sharedVitality) {
+            if (this.vitality.tick(participants)) {
+                endRun(SoulLinkState.Result.DEFEAT, "the shared soul ran out of health");
+                for (ServerPlayer player : participants) {
+                    player.kill(player.level());
+                }
+                return;
             }
-            return;
+            this.state.sharedHealth = this.vitality.health();
+            this.state.sharedFood = this.vitality.food();
+            this.state.sharedSaturation = this.vitality.saturation();
         }
-        this.state.sharedHealth = this.vitality.health();
-        this.state.sharedFood = this.vitality.food();
-        this.state.sharedSaturation = this.vitality.saturation();
-        if (this.ticks % 10 == 0) {
+        if (this.ticks % TIMER_DISPLAY_INTERVAL_TICKS == 0) {
             String display = this.state.timerPaused
                     ? "Paused — " + RunTimer.format(this.state.elapsedTicks)
                     : RunTimer.format(this.state.elapsedTicks);
@@ -515,12 +518,15 @@ public final class RunCoordinator {
         BlockPos spawn = runSpawn();
         this.server.setRespawnData(runRespawnData());
         this.vitality.reset(this.config.halfHeart ? 1.0F : 20.0F);
-        this.state.sharedHealth = this.vitality.health();
+        this.state.sharedVitality = this.config.sharedVitality;
+        this.state.soulLinkHardcore = this.config.soulLinkHardcore;
+        this.state.sharedHealth = this.state.sharedVitality ? this.vitality.health() : -1.0F;
         this.state.sharedPotions = this.config.sharedPotions;
         this.state.halfHeart = this.config.halfHeart;
         this.state.playerMaxHealthBases.clear();
         this.state.timerPaused = false;
         this.state.participants.clear();
+        this.state.eliminatedParticipants.clear();
         ServerLevel overworld = this.server.overworld();
         for (ServerPlayer player : List.copyOf(this.server.getPlayerList().getPlayers())) {
             SessionReset.resetPlayer(this.server, player, GameType.SURVIVAL);
@@ -626,7 +632,9 @@ public final class RunCoordinator {
             case RUNNING -> {
                 if (currentParticipant) {
                     this.vitality.forget(player.getUUID());
-                    if (!isRunLevel(player.level())) {
+                    if (this.state.eliminatedParticipants.contains(uuid)) {
+                        placeEliminatedSpectator(player);
+                    } else if (!isRunLevel(player.level())) {
                         // Saved player data older than the run (a crash right after it started).
                         SoulLink.LOGGER.warn("{} rejoined outside the run; returning them to the run spawn",
                                 player.getGameProfile().name());
@@ -676,9 +684,10 @@ public final class RunCoordinator {
         if (!MinecraftCompat.hasOperatorPermission(player) || this.state.onboardedOperators.contains(player.getUUID().toString())) {
             return;
         }
-        player.sendSystemMessage(Component.literal("Soul Link is cooperative: players share health, hunger, and saturation. "
-                + "Damage adds together; simultaneous healing only applies the largest individual heal. A participant death "
-                + "or an empty shared health pool ends the run; defeat the Ender Dragon to win."));
+        player.sendSystemMessage(Component.literal("Soul Link runs can link health, hunger, and saturation. By default, "
+                + "damage adds together and simultaneous healing only applies the largest individual heal. Operators can "
+                + "change shared vitality with /soullink rules sharedVitality. With it off, vanilla respawn rules apply; "
+                + "Soul Link Hardcore can end the run on the first death."));
         player.sendSystemMessage(Component.literal("Each run uses a fresh world. The first run starts automatically once its "
                 + "spawn is ready; later runs use /soullink start."));
         player.sendSystemMessage(Component.literal("Use /soullink help for commands. Operators can inspect /soullink status "
@@ -693,13 +702,44 @@ public final class RunCoordinator {
 
     public void onPlayerDeath(ServerPlayer player) {
         if (this.state.status == SoulLinkState.Status.RUNNING && isParticipant(player) && isRunLevel(player.level())) {
-            endRun(SoulLinkState.Result.DEFEAT, player.getGameProfile().name() + " died");
+            boolean vanillaHardcore = this.server.getWorldData().isHardcore();
+            if (!this.state.sharedVitality && !this.state.soulLinkHardcore && vanillaHardcore) {
+                String uuid = player.getUUID().toString();
+                if (!this.state.eliminatedParticipants.contains(uuid)) {
+                    this.state.eliminatedParticipants.add(uuid);
+                }
+            }
+            DeathRules.Outcome outcome = DeathRules.afterDeath(this.state.sharedVitality,
+                    this.state.soulLinkHardcore, vanillaHardcore,
+                    this.state.participants, this.state.eliminatedParticipants);
+            if (outcome == DeathRules.Outcome.END_RUN) {
+                endRun(SoulLinkState.Result.DEFEAT, player.getGameProfile().name() + " died");
+            } else if (outcome == DeathRules.Outcome.TEAM_WIPE) {
+                endRun(SoulLinkState.Result.DEFEAT, "the team was eliminated");
+            } else {
+                save();
+                if (vanillaHardcore) {
+                    int remaining = this.state.participants.size() - this.state.eliminatedParticipants.size();
+                    broadcast(Component.literal(player.getGameProfile().name() + " was eliminated. " + remaining
+                            + " of " + this.state.participants.size() + " participants remain.")
+                            .withStyle(ChatFormatting.YELLOW));
+                } else {
+                    broadcast(Component.literal(player.getGameProfile().name() + " died. The run continues.")
+                            .withStyle(ChatFormatting.YELLOW));
+                }
+            }
         }
     }
 
     public void onPlayerRespawn(ServerPlayer player) {
         switch (this.state.status) {
-            case RUNNING -> applyHalfHeart(player);
+            case RUNNING -> {
+                if (this.state.eliminatedParticipants.contains(player.getUUID().toString())) {
+                    placeEliminatedSpectator(player);
+                } else {
+                    applyHalfHeart(player);
+                }
+            }
             case ENDED -> {
                 // A victorious participant returning through the exit portal keeps playing.
                 if (isParticipant(player) && this.state.result != SoulLinkState.Result.VICTORY) {
@@ -741,14 +781,44 @@ public final class RunCoordinator {
 
     /** Sets a run rule for the next run and persists it to the config file. */
     public Component setSharedPotions(boolean enabled) {
+        boolean previous = this.config.sharedPotions;
         this.config.sharedPotions = enabled;
         try {
             this.config.save(SoulLink.configPath());
         } catch (IOException e) {
+            this.config.sharedPotions = previous;
             SoulLink.LOGGER.error("Could not save the Soul Link config", e);
             return Component.literal("Could not save the config: " + e.getMessage()).withStyle(ChatFormatting.RED);
         }
         return Component.literal("Shared potions " + (enabled ? "on" : "off") + " from the next run.");
+    }
+
+    /** Persists shared health, food, and saturation for the next run. */
+    public Component setSharedVitality(boolean enabled) {
+        boolean previous = this.config.sharedVitality;
+        this.config.sharedVitality = enabled;
+        try {
+            this.config.save(SoulLink.configPath());
+        } catch (IOException e) {
+            this.config.sharedVitality = previous;
+            SoulLink.LOGGER.error("Could not save the Soul Link config", e);
+            return Component.literal("Could not save the config: " + e.getMessage()).withStyle(ChatFormatting.RED);
+        }
+        return Component.literal("Shared vitality " + (enabled ? "on" : "off") + " from the next run.");
+    }
+
+    /** Persists the one-death defeat rule for future runs. */
+    public Component setSoulLinkHardcore(boolean enabled) {
+        boolean previous = this.config.soulLinkHardcore;
+        this.config.soulLinkHardcore = enabled;
+        try {
+            this.config.save(SoulLink.configPath());
+        } catch (IOException e) {
+            this.config.soulLinkHardcore = previous;
+            SoulLink.LOGGER.error("Could not save the Soul Link config", e);
+            return Component.literal("Could not save the config: " + e.getMessage()).withStyle(ChatFormatting.RED);
+        }
+        return Component.literal("Soul Link Hardcore " + (enabled ? "on" : "off") + " from the next run.");
     }
 
     /** Changes vanilla's world-persisted naturalRegeneration rule immediately. */
@@ -931,6 +1001,15 @@ public final class RunCoordinator {
         return Vec3.atBottomCenterOf(player.adjustSpawnLocation(level, spawn));
     }
 
+    private void placeEliminatedSpectator(ServerPlayer player) {
+        player.setGameMode(GameType.SPECTATOR);
+        if (!isRunLevel(player.level())) {
+            ServerLevel overworld = this.server.overworld();
+            player.teleport(new TeleportTransition(overworld, spawnPointFor(player, overworld, runSpawn()), Vec3.ZERO,
+                    0.0F, 0.0F, TeleportTransition.DO_NOTHING));
+        }
+    }
+
     private BlockPos runSpawn() {
         return new BlockPos(this.state.spawnX, this.state.spawnY, this.state.spawnZ);
     }
@@ -987,7 +1066,11 @@ public final class RunCoordinator {
         info.append(" | Time ").append(this.state.timerPaused ? "Paused — " : "")
                 .append(RunTimer.format(this.state.elapsedTicks));
         if (this.state.status == SoulLinkState.Status.RUNNING) {
-            info.append(String.format(" | Health %.1f Food %d", this.vitality.health(), this.vitality.food()));
+            if (this.state.sharedVitality) {
+                info.append(String.format(" | Shared health %.1f Food %d", this.vitality.health(), this.vitality.food()));
+            } else {
+                info.append(" | Shared vitality off");
+            }
         }
         info.append(" | Next world: ").append(this.preparation.progressDescription());
         info.append(" | Prepared: ").append(this.preparation.readyCount()).append('/')
@@ -1014,7 +1097,17 @@ public final class RunCoordinator {
         info.append("\nPrepared future runs: ").append(this.preparation.readyCount()).append(" / ")
                 .append(this.preparation.readyLimit());
         if (this.state.status == SoulLinkState.Status.RUNNING) {
-            info.append(String.format("\nShared health: %.1f | Food: %d", this.vitality.health(), this.vitality.food()));
+            if (this.state.sharedVitality) {
+                info.append(String.format("\nShared health: %.1f | Food: %d", this.vitality.health(), this.vitality.food()));
+            }
+        }
+        info.append("\nShared vitality: current run ").append(this.state.sharedVitality ? "on" : "off")
+                .append(", next run ").append(this.config.sharedVitality ? "on" : "off");
+        info.append("\nSoul Link Hardcore: current run ").append(this.state.soulLinkHardcore ? "on" : "off")
+                .append(", next run ").append(this.config.soulLinkHardcore ? "on" : "off");
+        if (!this.state.eliminatedParticipants.isEmpty()) {
+            info.append("\nEliminated: ").append(this.state.eliminatedParticipants.size()).append(" / ")
+                    .append(this.state.participants.size());
         }
         info.append("\nShared potions: current run ").append(this.state.sharedPotions ? "on" : "off")
                 .append(", next run ").append(this.config.sharedPotions ? "on" : "off");
@@ -1067,17 +1160,27 @@ public final class RunCoordinator {
         JsonArray participants = new JsonArray();
         this.state.participants.forEach(participants::add);
         json.add("participants", participants);
+        JsonArray eliminated = new JsonArray();
+        this.state.eliminatedParticipants.forEach(eliminated::add);
+        json.add("eliminatedParticipants", eliminated);
         JsonObject shared = new JsonObject();
-        shared.addProperty("health", this.vitality.health());
-        shared.addProperty("food", this.vitality.food());
-        shared.addProperty("saturation", this.vitality.saturation());
+        shared.addProperty("enabled", this.state.sharedVitality);
+        if (this.state.sharedVitality) {
+            shared.addProperty("health", this.vitality.health());
+            shared.addProperty("food", this.vitality.food());
+            shared.addProperty("saturation", this.vitality.saturation());
+        }
         json.add("shared", shared);
         JsonObject rules = new JsonObject();
+        rules.addProperty("sharedVitality", this.state.sharedVitality);
+        rules.addProperty("soulLinkHardcore", this.state.soulLinkHardcore);
         rules.addProperty("sharedPotions", this.state.sharedPotions);
         rules.addProperty("halfHeart", this.state.halfHeart);
         rules.addProperty("naturalRegeneration", MinecraftCompat.naturalRegeneration(this.server));
         json.add("rules", rules);
         JsonObject nextRules = new JsonObject();
+        nextRules.addProperty("sharedVitality", this.config.sharedVitality);
+        nextRules.addProperty("soulLinkHardcore", this.config.soulLinkHardcore);
         nextRules.addProperty("sharedPotions", this.config.sharedPotions);
         nextRules.addProperty("halfHeart", this.config.halfHeart);
         json.add("nextRules", nextRules);

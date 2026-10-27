@@ -8,7 +8,7 @@
 | [Architecture](architecture.md) | Lifecycle owners, compatibility split, and links to focused guides. |
 | [Architecture decisions](architecture-decisions.md) | Durable runtime and release choices. |
 | [Reference index](reference/README.md) | Navigation for operator, compatibility, and publishing references. |
-| [Gameplay guide](gameplay.md) | Lobby, run flow, shared vitality, effects, participants, and outcomes. |
+| [Gameplay guide](gameplay.md) | Lobby, run flow, shared vitality options, effects, participants, and outcomes. |
 | [Configuration guide](configuration.md) | Every operator setting, default, supported range, and custom dimension setup. |
 | [Operations and compatibility reference](reference.md) | Session reset details, persistence, pregeneration, measured costs, modpack coverage, and current client repro. |
 | [Product and gameplay backlog](roadmap.md) | Requested onboarding, command experience, and gameplay-rule improvements awaiting implementation. |

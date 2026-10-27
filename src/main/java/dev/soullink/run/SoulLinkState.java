@@ -5,9 +5,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import com.google.gson.JsonParseException;
 import dev.soullink.SoulLink;
@@ -51,6 +53,10 @@ public final class SoulLinkState {
     public int spawnY;
     public int spawnZ;
     public long elapsedTicks;
+    /** Shared health and food rule captured when the active run starts. */
+    public boolean sharedVitality = true;
+    /** One-death defeat rule captured when the active run starts. */
+    public boolean soulLinkHardcore;
     /** Shared potions for the active run, fixed when the run starts. */
     public boolean sharedPotions;
     /** Half-heart rule fixed when the run starts. */
@@ -60,6 +66,8 @@ public final class SoulLinkState {
     /** Pauses only elapsedTicks; the world and shared vitality continue running. */
     public boolean timerPaused;
     public List<String> participants = new ArrayList<>();
+    /** Participants eliminated by vanilla hardcore in an unlinked run. */
+    public List<String> eliminatedParticipants = new ArrayList<>();
     /** Operator UUIDs that already received the one-time onboarding message. */
     public List<String> onboardedOperators = new ArrayList<>();
     /** Player UUID to the run their saved player state belongs to (FR-07 for offline players). */
@@ -85,11 +93,14 @@ public final class SoulLinkState {
         copy.spawnY = this.spawnY;
         copy.spawnZ = this.spawnZ;
         copy.elapsedTicks = this.elapsedTicks;
+        copy.sharedVitality = this.sharedVitality;
+        copy.soulLinkHardcore = this.soulLinkHardcore;
         copy.sharedPotions = this.sharedPotions;
         copy.halfHeart = this.halfHeart;
         copy.playerMaxHealthBases = new LinkedHashMap<>(this.playerMaxHealthBases);
         copy.timerPaused = this.timerPaused;
         copy.participants = new ArrayList<>(this.participants);
+        copy.eliminatedParticipants = new ArrayList<>(this.eliminatedParticipants);
         copy.onboardedOperators = new ArrayList<>(this.onboardedOperators);
         copy.playerRuns = new LinkedHashMap<>(this.playerRuns);
         copy.sharedHealth = this.sharedHealth;
@@ -108,17 +119,104 @@ public final class SoulLinkState {
         try {
             SoulLinkState state = Json.GSON.fromJson(Files.readString(file, StandardCharsets.UTF_8), SoulLinkState.class);
             if (state != null) {
+                boolean sanitized = false;
+                if (state.formatVersion != 1) {
+                    SoulLink.LOGGER.error("Unsupported Soul Link state version {} in {}; starting from the lobby",
+                            state.formatVersion, file);
+                    return new SoulLinkState();
+                }
+                if (state.status == null) {
+                    state.status = Status.LOBBY;
+                    sanitized = true;
+                }
+                if (state.result == null) {
+                    state.result = Result.NONE;
+                    sanitized = true;
+                }
                 if (state.participants == null) {
                     state.participants = new ArrayList<>();
+                    sanitized = true;
+                } else {
+                    List<String> valid = canonicalUuids(state.participants);
+                    sanitized |= !valid.equals(state.participants);
+                    state.participants = valid;
+                }
+                if (state.eliminatedParticipants == null) {
+                    state.eliminatedParticipants = new ArrayList<>();
+                    sanitized = true;
+                } else {
+                    List<String> valid = canonicalUuids(state.eliminatedParticipants);
+                    valid.removeIf(uuid -> !state.participants.contains(uuid));
+                    sanitized |= !valid.equals(state.eliminatedParticipants);
+                    state.eliminatedParticipants = valid;
                 }
                 if (state.playerRuns == null) {
                     state.playerRuns = new LinkedHashMap<>();
+                    sanitized = true;
+                } else {
+                    Map<String, String> valid = new LinkedHashMap<>();
+                    state.playerRuns.forEach((playerId, runId) -> {
+                        if (isCanonicalUuid(playerId) && ("lobby".equals(runId) || isCanonicalUuid(runId))) {
+                            valid.put(playerId, runId);
+                        }
+                    });
+                    sanitized |= !valid.equals(state.playerRuns);
+                    state.playerRuns = valid;
                 }
                 if (state.onboardedOperators == null) {
                     state.onboardedOperators = new ArrayList<>();
+                    sanitized = true;
+                } else {
+                    List<String> valid = canonicalUuids(state.onboardedOperators);
+                    sanitized |= !valid.equals(state.onboardedOperators);
+                    state.onboardedOperators = valid;
                 }
                 if (state.playerMaxHealthBases == null) {
                     state.playerMaxHealthBases = new LinkedHashMap<>();
+                    sanitized = true;
+                } else {
+                    Map<String, Double> valid = new LinkedHashMap<>();
+                    state.playerMaxHealthBases.forEach((playerId, base) -> {
+                        if (isCanonicalUuid(playerId) && base != null && Double.isFinite(base) && base > 0.0) {
+                            valid.put(playerId, base);
+                        }
+                    });
+                    sanitized |= !valid.equals(state.playerMaxHealthBases);
+                    state.playerMaxHealthBases = valid;
+                }
+                if (state.activeRunId != null && !isCanonicalUuid(state.activeRunId)) {
+                    // A corrupt run identity cannot safely be reconciled or used to admit rejoining players.
+                    state.status = Status.LOBBY;
+                    state.result = Result.NONE;
+                    state.endReason = null;
+                    state.activeRunId = null;
+                    state.activeRunStarted = false;
+                    state.participants.clear();
+                    state.eliminatedParticipants.clear();
+                    state.sharedHealth = -1.0F;
+                    sanitized = true;
+                }
+                if ((state.status == Status.RUNNING || state.status == Status.ENDED) && state.activeRunId == null) {
+                    state.status = Status.LOBBY;
+                    state.result = Result.NONE;
+                    state.activeRunStarted = false;
+                    state.participants.clear();
+                    state.eliminatedParticipants.clear();
+                    state.sharedHealth = -1.0F;
+                    sanitized = true;
+                }
+                if (state.elapsedTicks < 0 || state.runsStarted < 0 || state.victories < 0) {
+                    state.elapsedTicks = Math.max(0, state.elapsedTicks);
+                    state.runsStarted = Math.max(0, state.runsStarted);
+                    state.victories = Math.max(0, state.victories);
+                    sanitized = true;
+                }
+                if (state.bestVictoryTicks != null && state.bestVictoryTicks < 0) {
+                    state.bestVictoryTicks = null;
+                    sanitized = true;
+                }
+                if (sanitized) {
+                    SoulLink.LOGGER.warn("Sanitized invalid fields in Soul Link state {}; continuing from the safest recoverable state", file);
                 }
                 return state;
             }
@@ -126,5 +224,26 @@ public final class SoulLinkState {
             SoulLink.LOGGER.error("Unreadable Soul Link state {}; starting from the lobby", file, e);
         }
         return new SoulLinkState();
+    }
+
+    private static List<String> canonicalUuids(List<String> values) {
+        LinkedHashSet<String> valid = new LinkedHashSet<>();
+        for (String value : values) {
+            if (isCanonicalUuid(value)) {
+                valid.add(value);
+            }
+        }
+        return new ArrayList<>(valid);
+    }
+
+    private static boolean isCanonicalUuid(String value) {
+        if (value == null) {
+            return false;
+        }
+        try {
+            return UUID.fromString(value).toString().equals(value);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 }

@@ -5,8 +5,12 @@ toolchain versions live in `gradle/minecraft-targets.json`.
 
 ## Implemented
 
-- Shared health, food, saturation, damage, run timer, run records, end-of-run
-  outcomes, late-join handling, and restart recovery.
+- Shared vitality defaults on and is an operator-configurable next-run rule;
+  health, food, and saturation remain per-player when it is off. Run timer, run
+  records, end-of-run outcomes, late-join handling, and restart recovery.
+- Death handling preserves the linked-run one-death defeat. In unlinked runs,
+  vanilla normal mode permits respawns and vanilla hardcore ends on team wipe;
+  the separate operator-configurable Soul Link Hardcore rule ends on first death.
 - Persistent lobby, asynchronous preparation, optional pregeneration, and
   replacement of configured canonical dimensions through bundled Terra Rasa.
 - The lobby platform has a polished-blackstone edge and a two-block-high
@@ -60,9 +64,16 @@ phase descriptions and only repeats a steady phase every 30 seconds. Terra
 Rasa lets an already spawn-ready preparation finish flushing after its overall
 deadline; staged-level close and manifest publication retain bounded drain
 timeouts. Earlier required phases still fail at the overall deadline, which
-stops optional pregeneration. These changes are implemented but have not been
-verified in a server run. A separate Waystones `Items` NBT type warning came
-from C2ME worldgen.
+stops optional pregeneration.
+
+A focused real-server regression passed on Minecraft 26.2 with Java 25. It set
+a 120-second preparation deadline and intentionally incomplete 800-block
+overworld pregeneration; the run flushed and published after 120,651 ms, with
+the manifest showing pregeneration incomplete. This verifies the reported
+`FLUSHING` timeout path on 26.2. The test did not include WTHIT, C2ME, or
+Waystones. The 1.21.11 target was not run because Java 21 is unavailable in
+this environment. The earlier Waystones `Items` NBT type warning came from
+C2ME worldgen.
 
 ## Requested work
 
