@@ -1,9 +1,9 @@
 # Soul Link Agent Guide
 
-Soul Link is a server-side Fabric mod for linked player health and rotating
-seeded-world runs. It owns run state, gameplay rules, commands, and player
-movement. The Terra Rasa library owns world preparation and canonical-world
-replacement.
+Soul Link is a server-authoritative Fabric mod for linked player health and
+rotating seeded-world runs. It owns run state, gameplay rules, commands, and
+player movement on dedicated and integrated servers. The Terra Rasa library
+owns world preparation and canonical-world replacement.
 
 ## Read first
 

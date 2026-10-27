@@ -25,6 +25,10 @@ toolchain versions live in `gradle/minecraft-targets.json`.
   26.x line.
 - One versioned GitHub release with a separate jar and Modrinth version for
   each supported game target.
+- Integrated single-player and LAN-host support is prepared for the coordinated
+  0.3.0 release across all six targets. A rendered 26.2 single-player smoke
+  test passed through first-run activation; vanilla LAN guest login remains
+  unverified.
 
 ## Known compatibility issue
 

@@ -62,7 +62,7 @@ This document tracks the requested Soul Link improvements and their implementati
 
 ## Platform support
 
-- **Deferred from 0.2:** Single-player integrated servers and LAN hosting are not supported by this dedicated-server release. Track them for a later release, including a client-capable Fabric environment declaration, Modrinth environment metadata, and testing on an actual integrated server with LAN players.
+- Integrated-server host support is included in the coordinated 0.3.0 release across all six targets in `gradle/minecraft-targets.json`. Vanilla LAN guest login and its custom-dimension/world-swap synchronization still need a rendered-client check. Keep server-owned run state scoped to each world's `LevelResource.ROOT`.
 
 ## Acceptance notes
 
