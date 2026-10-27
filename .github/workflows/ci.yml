@@ -34,7 +34,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: qwasdf-1/terra-rasa
-          ref: minecraft-version-support
+          ref: main
           path: terra-rasa
 
       - name: Install Java ${{ matrix.java_version }}
@@ -86,7 +86,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: qwasdf-1/terra-rasa
-          ref: minecraft-version-support
+          ref: main
           path: terra-rasa
 
       - name: Install Java ${{ matrix.java_version }}
