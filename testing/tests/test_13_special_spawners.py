@@ -54,7 +54,7 @@ def test_each_run_overworld_ticks_its_own_vanilla_spawners(server, players):
     assert later["CatSpawner"]["counters"]["nextTick"] != by_type(first)["CatSpawner"]["counters"]["nextTick"]
     assert spawners(server)["wanderingTrader"]["spawnDelay"] == 24000 - 1200, "the trader timer advanced"
 
-    status = start_run(server, players, command="reset")
+    status = start_run(server, players, command="soullink reset")
     second = spawners(server)
     assert second["level"] == levels(status)[OVERWORLD]["identity"] != first["level"]
     assert [s["type"] for s in second["spawners"]] == VANILLA_SPAWNERS
@@ -99,7 +99,7 @@ def test_phantoms_spawn_over_an_insomniac_player(server, players):
 
 
 def test_a_new_run_resets_insomnia(server, players):
-    start_run(server, players, command="reset")
+    start_run(server, players, command="soullink reset")
     for bot in players:
         player = server.player(bot.name)
         assert player["timeSinceRest"] < 20 * 60, "statistics start over with the world"

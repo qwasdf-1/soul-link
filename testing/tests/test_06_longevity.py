@@ -23,7 +23,7 @@ def test_many_reset_cycles_without_degradation(server):
     totals: list[int] = []
     seeds: set[int] = set()
     for cycle in range(CYCLES):
-        status = start_run(server, players, command="reset")
+        status = start_run(server, players, command="soullink reset")
         seeds.add(status["runSeed"])
         totals.append(status["activation"]["lastTimingsMillis"]["total"])
         assert levels(status)[OVERWORLD]["seed"] == status["runSeed"]

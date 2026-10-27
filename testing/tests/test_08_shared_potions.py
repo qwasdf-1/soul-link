@@ -39,7 +39,7 @@ def test_rule_change_applies_from_the_next_run(server, players):
     server.rcon("effect give Alice minecraft:haste 60 0")
     assert "minecraft:haste" not in effects(server, "Bob"), "the running run keeps its rules"
 
-    status = start_run(server, players, command="reset")
+    status = start_run(server, players, command="soullink reset")
     assert status["rules"]["sharedPotions"]
 
 
@@ -89,7 +89,7 @@ def test_late_joiner_receives_the_team_effects(server, players):
 
 
 def test_lobby_players_are_never_linked(server, players):
-    server.rcon("stoprun")
+    server.rcon("soullink stop")
     server.wait_until(lambda s: s["status"] == "LOBBY", 10, "the lobby")
     server.rcon("effect give Alice minecraft:speed 60 0")
     assert "minecraft:speed" not in effects(server, "Bob")

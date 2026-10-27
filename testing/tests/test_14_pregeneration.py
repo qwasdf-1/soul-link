@@ -1,5 +1,5 @@
 """Pregeneration with Soul Link's defaults: 500 blocks around the run spawn, 96 in the Nether, 160 around
-the End island. The next run pregenerates in the background while players play; /start and /reset never
+the End island. The next run pregenerates in the background while players play; /soullink start and /soullink reset never
 wait for it, and what a run did not pregenerate yet continues in its live world.
 """
 
@@ -36,7 +36,7 @@ def tick_times(server) -> tuple[float, float, float]:
 
 
 def enter(server, players, command: str) -> float:
-    """Issues /start or /reset while the next run is pregenerating; returns how long the players waited."""
+    """Issues /soullink start or /soullink reset while the next run is pregenerating; returns how long the players waited."""
     wait_true(lambda: active(server).get("state") == "PREGENERATING" and active(server).get("pregenerated", 0) > 100,
               240, "the next run to be pregenerating")
     marks = [bot.dimension_count() for bot in players]
@@ -49,8 +49,13 @@ def enter(server, players, command: str) -> float:
 
 
 def test_start_does_not_wait_for_pregeneration(server, players):
-    waited = enter(server, players, "start")
-    print(f"/start during pregeneration: players waited {waited:.1f} s")
+    # This release starts the first run automatically. Put players in the lobby so this test measures
+    # /start entering the prepared future run, rather than issuing /start during the already-live first run.
+    server.wait_until(lambda status: status["status"] in ("RUNNING", "ENDED"), 240,
+                      "the automatically started first run")
+    server.rcon("soullink stop")
+    waited = enter(server, players, "soullink start")
+    print(f"/soullink start during pregeneration: players waited {waited:.1f} s")
     assert waited < 20
     area = live(server)[OVERWORLD]
     assert area["done"] < area["total"], "the rest of the run's area continues in the live world"
@@ -58,7 +63,7 @@ def test_start_does_not_wait_for_pregeneration(server, players):
 
 def test_background_pregeneration_keeps_ticks_in_budget(server, players):
     # The next run prepares and pregenerates while this run's live area is generated too. The first 5 s
-    # after /start hold the swap itself, a known one-off pause that /tick query would report as its P99.
+    # after /soullink start hold the swap itself, a known one-off pause that /tick query would report as its P99.
     time.sleep(6)
     windows = []
     deadline = time.monotonic() + 60
@@ -73,8 +78,8 @@ def test_background_pregeneration_keeps_ticks_in_budget(server, players):
 
 
 def test_reset_does_not_wait_for_pregeneration(server, players):
-    waited = enter(server, players, "reset")
-    print(f"/reset during pregeneration: players waited {waited:.1f} s")
+    waited = enter(server, players, "soullink reset")
+    print(f"/soullink reset during pregeneration: players waited {waited:.1f} s")
     assert waited < 20
 
 

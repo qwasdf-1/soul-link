@@ -44,7 +44,7 @@ def test_server_and_player_state_is_reset_between_runs(server, players):
     assert dirty["inventoryItems"] == 5 and dirty["xpLevel"] == 30 and dirty["tags"] == ["marked"]
     assert passes(server, "if entity @a[name=Alice,advancements={minecraft:adventure/root=true}]")
 
-    status = start_run(server, players, command="reset")
+    status = start_run(server, players, command="soullink reset")
 
     assert "There are no objectives" in server.rcon("scoreboard objectives list")
     assert "There are no teams" in server.rcon("team list")
@@ -99,7 +99,7 @@ def test_reconnecting_participant_keeps_their_run_state(server, players):
 
 def test_offline_player_is_reset_when_returning_after_a_new_run(server, players):
     server.disconnect_bot("Carol")
-    start_run(server, players, command="reset")
+    start_run(server, players, command="soullink reset")
     returning = server.bot("Carol")
     returning.wait_for_dimension(OVERWORLD, timeout=30)
     player = server.player("Carol")
@@ -107,9 +107,9 @@ def test_offline_player_is_reset_when_returning_after_a_new_run(server, players)
     assert player["health"] == 20.0
 
 
-def test_stoprun_returns_everyone_to_the_lobby(server, players):
+def test_soullink_stop_returns_everyone_to_the_lobby(server, players):
     marks = [bot.dimension_count() for bot in players]
-    server.rcon("stoprun")
+    server.rcon("soullink stop")
     for bot, mark in zip(players, marks):
         bot.wait_for_dimension(LOBBY, timeout=20, after=mark)
         assert server.player(bot.name)["gameMode"] == "adventure"

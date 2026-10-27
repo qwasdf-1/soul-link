@@ -44,7 +44,7 @@ def test_injected_failure_rolls_back_in_process(server, players, point):
     marks = [bot.dimension_count() for bot in players]
 
     server.rcon(f"soullink debug fail {point}")
-    output = server.rcon("reset")
+    output = server.rcon("soullink reset")
     assert "rolled back" in output, output
 
     status = server.status()
@@ -76,7 +76,7 @@ def crash_during_activation(server, point: str) -> tuple[dict, dict]:
     ready = server.wait_prepared()
     server.rcon(f"soullink debug fail {point}")
     try:
-        server.rcon("reset")
+        server.rcon("soullink reset")
     except Exception:  # noqa: BLE001 - the JVM halts while the command runs
         pass
     assert server.wait_exit(60) == HALT_STATUS, "the server should have halted at the fault point"
@@ -110,11 +110,11 @@ def test_crash_after_promotion_rolls_forward_at_startup(fresh_server):
     assert status["journal"]["phase"] == "COMMITTED"
     assert status["globalSeed"] == ready["seed"], "the journal re-asserts the promoted run's seed"
     assert levels(status)[OVERWORLD]["seed"] == ready["seed"]
-    # The committed run was never entered; /start enters it without another activation.
+    # The committed run was never entered; /soullink start enters it without another activation.
     assert status["activeRunId"] == ready["runId"] and not status["activeRunStarted"]
     alice = fresh_server.bot("Alice")
     assert alice.state.dimension == LOBBY
-    fresh_server.rcon("start")
+    fresh_server.rcon("soullink start")
     alice.wait_for_dimension(OVERWORLD, timeout=30)
     status = fresh_server.status()
     assert status["status"] == "RUNNING" and status["activation"]["activations"] == 0

@@ -18,23 +18,25 @@ def players(server):
     return [server.bot("Alice"), server.bot("Bob")]
 
 
-def test_lobby_is_a_persistent_service_dimension(server, players):
-    status = server.status()
+def test_first_run_starts_automatically_and_lobby_persists(server, players):
+    status = server.wait_until(lambda s: s["status"] == "RUNNING" and s["runsStarted"] >= 1, 240,
+                               "the first run to start automatically")
     by_key = levels(status)
     assert by_key[LOBBY]["class"] == "PERSISTENT_SERVICE"
     for key in RESETTABLE:
         assert by_key[key]["class"] == "RESETTABLE_CANONICAL"
         assert by_key[key]["dimension"] == key
     for bot in players:
-        assert bot.state.dimension == LOBBY
+        assert bot.state.dimension == OVERWORLD
         player = server.player(bot.name)
-        assert player["dimension"] == LOBBY
-        assert player["gameMode"] == "adventure"
-    assert status["status"] == "LOBBY"
+        assert player["dimension"] == OVERWORLD
+        assert player["gameMode"] == "survival"
+    assert status["activeRunStarted"]
 
 
 def test_preparation_is_isolated_from_canonical_levels(server, players):
-    before = levels(server.status())
+    before_status = server.status()
+    before = levels(before_status)
     ready = server.wait_prepared()
     status = server.status()
     after = levels(status)
@@ -46,8 +48,8 @@ def test_preparation_is_isolated_from_canonical_levels(server, players):
     # Preparation never touched the live canonical levels or the global seed.
     for key in RESETTABLE + (LOBBY,):
         assert after[key]["identity"] == before[key]["identity"]
-    assert status["globalSeed"] == 4242
-    assert ready["seed"] != 4242
+    assert status["globalSeed"] == before_status["globalSeed"]
+    assert ready["seed"] != status["globalSeed"]
     for dimension in ready["dimensions"]:
         namespace, path = dimension["stage"].split(":", 1)
         stage_dir = server.world / "dimensions" / namespace / path
@@ -60,7 +62,7 @@ def test_preparation_is_isolated_from_canonical_levels(server, players):
 
 def test_activation_replaces_canonical_levels_without_reconnecting(server, players):
     before = levels(server.status())
-    status = start_run(server, players)
+    status = start_run(server, players, command="soullink reset")
     after = levels(status)
     seed = status["runSeed"]
 
@@ -80,7 +82,7 @@ def test_activation_replaces_canonical_levels_without_reconnecting(server, playe
         bot.assert_connected()
         assert bot.state.play_entered == 1, "no re-login"
         assert bot.state.reconfigurations == 0
-        assert [c.dimension for c in bot.state.dimensions] == [LOBBY, OVERWORLD]
+        assert [c.dimension for c in bot.state.dimensions[-2:]] == [LOBBY, OVERWORLD]
         player = server.player(bot.name)
         assert player["dimension"] == OVERWORLD
         assert player["gameMode"] == "survival"
@@ -115,7 +117,7 @@ def test_repeated_resets_use_fresh_seeds_without_leaking_levels(server, players)
     identities: set[str] = set()
     totals: list[int] = []
     for _ in range(10):
-        status = start_run(server, players, command="reset")
+        status = start_run(server, players, command="soullink reset")
         seeds.add(status["runSeed"])
         identities.add(levels(status)[OVERWORLD]["identity"])
         totals.append(status["activation"]["lastTimingsMillis"]["total"])

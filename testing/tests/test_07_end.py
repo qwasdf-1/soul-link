@@ -15,7 +15,7 @@ import time
 
 import pytest
 
-from helpers import END, OVERWORLD, SoulLinkServer, block_pos, passes, start_run, wait_true
+from helpers import END, OVERWORLD, SoulLinkServer, block_pos, passes, start_run, wait_preparation_idle, wait_true
 
 RUN_SEED = 987654321
 
@@ -29,11 +29,14 @@ def players(server):
 def victorious(server, players):
     """A run with a known seed whose dragon Alice has killed, with both players still in it."""
     alice, _ = players
+    server.wait_until(lambda status: status["status"] == "RUNNING", 240,
+                      "the automatically started first run")
+    wait_preparation_idle(server)
     server.rcon("gamerule natural_health_regeneration false")
     server.rcon(f"soullink prepare {RUN_SEED} 1")
     server.wait_until(lambda s: (s["preparation"].get("ready") or {}).get("seed") == RUN_SEED, 240,
                       "the seeded run to be prepared")
-    status = start_run(server, players)
+    status = start_run(server, players, command="soullink reset")
     assert status["runSeed"] == RUN_SEED
     fight_before = end_fight(server)
 

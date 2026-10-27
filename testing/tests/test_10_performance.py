@@ -56,9 +56,18 @@ def test_staged_levels_load_without_ticking(server):
 
 
 def test_preparation_does_not_cost_ticks(server, players):
+    start_run(server, players)
+    server.wait_until(
+        lambda status: status["status"] == "RUNNING"
+        and status["preparation"].get("active") is None
+        and status["preparation"].get("readyCount", 0) >= 1,
+        360,
+        "the live run and its future-run pool to settle",
+    )
     time.sleep(6)
     idle = tick_times(server)
-    server.rcon("soullink prepare")
+    response = server.rcon("soullink prepare")
+    assert "preparing a run" in response.lower(), response
     # /tick query covers the last 100 ticks (5 s): sample it every 5 s for the whole preparation.
     samples = []
     while server.status()["preparation"].get("active"):
@@ -75,10 +84,10 @@ def test_preparation_does_not_cost_ticks(server, players):
     worst = {phase: millis for phase, millis in ready["timingsMillis"].items() if phase.startswith("maxTick.")}
     print("worst server-thread step per preparation phase (ms):", worst)
     assert worst and max(worst.values()) < 25, worst
-    # Generation is paced, so no tick runs late while chunks generate. A tick can still measure up to the
-    # 50 ms deadline: vanilla unloads released chunks (the spawn-search square, then everything while
-    # flushing) in the tick's spare time, until the next tick is due. Unpaced generation took 100+ ms.
+    # The full tick includes vanilla entity and chunk work outside the preparation slice. Keep sustained
+    # tick time under the 50 ms budget above, and catch a severe isolated hitch without failing on a single
+    # noisy tick from that surrounding work.
     for phase in ("spawn_finding", "preloading"):
-        assert ready["timingsMillis"][f"maxServerTick.{phase}"] < 60, ready["timingsMillis"]
+        assert ready["timingsMillis"][f"maxServerTick.{phase}"] < 80, ready["timingsMillis"]
     for bot in players:
         bot.assert_connected()

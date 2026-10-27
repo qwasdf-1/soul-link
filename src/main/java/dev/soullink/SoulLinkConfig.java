@@ -38,12 +38,16 @@ public final class SoulLinkConfig {
     public Map<String, Integer> pregeneration = defaultPregeneration();
     public int preparationTimeoutSeconds = 900;
     public int drainTimeoutSeconds = 60;
-    /** Keep one prepared run ready in the background whenever possible. */
+    /** Number of closed future runs to keep prepared; the currently active run is not counted. */
+    public int preparedRunPoolSize = 1;
+    /** Keep the configured number of prepared runs ready in the background whenever possible. */
     public boolean autoPrepare = true;
     /** Late joiners are synced into a running run; otherwise they wait in the lobby. */
     public boolean allowLateJoin = true;
     /** Shared potions: effects on one participant apply to every participant. Applies from the next run. */
     public boolean sharedPotions = false;
+    /** Reduces participants to one health point (half a heart), applying from the next run. */
+    public boolean halfHeart = false;
     /** Enables {@code /soullink debug ...}; still requires operator permission. */
     public boolean debugCommands = true;
 
@@ -110,6 +114,10 @@ public final class SoulLinkConfig {
         }
         if (this.preparationTimeoutSeconds < 10 || this.drainTimeoutSeconds < 5) {
             throw new IllegalArgumentException("lifecycle timeouts are too small");
+        }
+        if (this.preparedRunPoolSize < 1 || this.preparedRunPoolSize > dev.terrarasa.WorldPreparationService.MAX_READY_RUNS) {
+            throw new IllegalArgumentException("preparedRunPoolSize must be between 1 and "
+                    + dev.terrarasa.WorldPreparationService.MAX_READY_RUNS);
         }
     }
 

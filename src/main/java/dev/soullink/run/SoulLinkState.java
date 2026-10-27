@@ -53,7 +53,15 @@ public final class SoulLinkState {
     public long elapsedTicks;
     /** Shared potions for the active run, fixed when the run starts. */
     public boolean sharedPotions;
+    /** Half-heart rule fixed when the run starts. */
+    public boolean halfHeart;
+    /** Saved max-health base values to restore after the half-heart run ends. */
+    public Map<String, Double> playerMaxHealthBases = new LinkedHashMap<>();
+    /** Pauses only elapsedTicks; the world and shared vitality continue running. */
+    public boolean timerPaused;
     public List<String> participants = new ArrayList<>();
+    /** Operator UUIDs that already received the one-time onboarding message. */
+    public List<String> onboardedOperators = new ArrayList<>();
     /** Player UUID to the run their saved player state belongs to (FR-07 for offline players). */
     public Map<String, String> playerRuns = new LinkedHashMap<>();
     public float sharedHealth = -1.0F;
@@ -78,7 +86,11 @@ public final class SoulLinkState {
         copy.spawnZ = this.spawnZ;
         copy.elapsedTicks = this.elapsedTicks;
         copy.sharedPotions = this.sharedPotions;
+        copy.halfHeart = this.halfHeart;
+        copy.playerMaxHealthBases = new LinkedHashMap<>(this.playerMaxHealthBases);
+        copy.timerPaused = this.timerPaused;
         copy.participants = new ArrayList<>(this.participants);
+        copy.onboardedOperators = new ArrayList<>(this.onboardedOperators);
         copy.playerRuns = new LinkedHashMap<>(this.playerRuns);
         copy.sharedHealth = this.sharedHealth;
         copy.sharedFood = this.sharedFood;
@@ -101,6 +113,12 @@ public final class SoulLinkState {
                 }
                 if (state.playerRuns == null) {
                     state.playerRuns = new LinkedHashMap<>();
+                }
+                if (state.onboardedOperators == null) {
+                    state.onboardedOperators = new ArrayList<>();
+                }
+                if (state.playerMaxHealthBases == null) {
+                    state.playerMaxHealthBases = new LinkedHashMap<>();
                 }
                 return state;
             }
