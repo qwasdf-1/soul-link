@@ -1,6 +1,6 @@
 # Product and gameplay backlog
 
-This document tracks the requested Soul Link improvements and their implementation status. The 26.2 WTHIT/C2ME transition issue remains separately open in the local issue ledger.
+This document tracks requested Soul Link improvements and their implementation status. The 26.2 WTHIT/C2ME transition issue remains open pending further diagnosis.
 
 ## Operator onboarding and first run
 
@@ -63,6 +63,48 @@ This document tracks the requested Soul Link improvements and their implementati
 ## Platform support
 
 - Integrated-server host support is included in the coordinated 0.3.0 release across all six targets in `gradle/minecraft-targets.json`. Vanilla LAN guest login and its custom-dimension/world-swap synchronization still need a rendered-client check. Keep server-owned run state scoped to each world's `LevelResource.ROOT`.
+
+## Lobby and ended-run performance
+
+### Chosen lobby recovery behavior
+
+- [x] Add a two-block-high barrier perimeter just outside the lobby platform.
+- [x] Rescue players immediately when void damage occurs, while still
+  canceling lobby damage.
+- [x] Keep a five-second rescue backstop for falls caused by unusual movement
+  or future platform changes; do not rely on players falling forever.
+- [x] Cover all four barrier sides, void-damage rescue, and the periodic
+  backstop in the real-server integration suite.
+
+### Open performance questions
+
+- The lobby remains a registered dimension so it is available for the first
+  run, transitions, and `/soullink stop`. A two-client 26.2 comparison found
+  that disabling Soul Link's platform ticket did not change the lobby's 25
+  loaded / 1 block-ticking chunk counts or improve measured server percentiles.
+  Retain the ticket; the source of the loaded chunks without it is still unknown.
+- Ended dimensions currently continue normal gameplay until the next world
+  replacement. Keep post-victory exploration and vanilla exit portal/credits
+  behavior. Defeat freezing is deferred while spectators remain in the run:
+  `ServerLevel.tick` drives player entity movement as well as chunks, scheduled
+  block/fluid ticks, and block entities in both 1.21.11 and 26.2. Skipping the
+  level tick would strand spectators; selectively pausing other simulation
+  needs deeper cross-version hooks and broader mod compatibility proof.
+
+## Run transition feedback
+
+- A swap moves players to the lobby, saves and retires the old dimensions,
+  promotes prepared world data, reconstructs and validates the new dimensions,
+  then sends players into the new run. This is a synchronous server-thread
+  operation; the server cannot process ordinary game ticks during activation.
+- [x] Broadcast a clear player-facing notice before world activation and a
+  separate notice after the new run is ready. Detailed phase notices remain
+  unsuitable inside the blocking activation because the server cannot process
+  ordinary game ticks until it finishes.
+- The operations reference records the paired measurement and its limits. The
+  26.2 two-client probe measured Soul Link idle work at about 15.8 microseconds
+  mean and 112 microseconds p99; treat it as a local baseline, not a guarantee
+  for other servers or modpacks.
 
 ## Acceptance notes
 

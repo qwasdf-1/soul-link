@@ -16,6 +16,13 @@ cd ../soul-link && ./gradlew build  # default target is 26.2; CI builds and test
 
 CI runs the build and unit tests for all six targets on every push and pull request. The dedicated-server suite runs for each target on manual dispatch; the reference modpack suite is pinned to 26.2. Run the relevant server suite locally before opening a pull request that changes gameplay or the run lifecycle.
 
+## Repository Checks
+
+Run `sh scripts/install-git-hooks.sh` once per checkout to enable the local
+pre-commit check. The hook checks the staged tree. Run
+`python3 scripts/check_doc_boundary.py` to audit the working copy, including
+non-ignored untracked documents.
+
 ## Changes
 
 - Gameplay a player can observe needs an integration test with the headless clients in [testing/tests](testing/tests). Each module fails on unexpected `ERROR` lines in the server log.

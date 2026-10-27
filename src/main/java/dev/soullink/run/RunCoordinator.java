@@ -48,6 +48,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.RandomSupport;
@@ -69,6 +71,7 @@ public final class RunCoordinator {
     private static final String LOBBY_STAMP = "lobby";
     private static final int PREPARE_RETRY_TICKS = 20 * 30;
     private static final int STATE_SAVE_INTERVAL_TICKS = 20 * 5;
+    private static final int LOBBY_RESCUE_INTERVAL_TICKS = 20 * 5;
     private static final int PREPARATION_NOTICE_INTERVAL_TICKS = 20 * 30;
 
     /** The coordinator of the running server; set from server start to server stop. */
@@ -286,7 +289,7 @@ public final class RunCoordinator {
     }
 
     private void rescueLobbyFallers() {
-        if (this.ticks % 5 != 0) {
+        if (this.ticks % LOBBY_RESCUE_INTERVAL_TICKS != 0) {
             return;
         }
         for (ServerPlayer player : List.copyOf(this.server.getPlayerList().getPlayers())) {
@@ -461,6 +464,8 @@ public final class RunCoordinator {
 
     private Component startPreparedRun() {
         // Phase 1: everyone into the lobby and back to baseline while their current levels are still live.
+        broadcast(Component.literal("World swap starting: moving everyone to the lobby and replacing the run worlds. "
+                + "This can take a few seconds.").withStyle(ChatFormatting.GRAY));
         this.swappedThisTick = true;
         moveEveryoneToLobby();
         RunManifest manifest = this.preparation.takeReady();
@@ -547,6 +552,7 @@ public final class RunCoordinator {
         this.server.getPlayerList().saveAll();
         title(Component.literal("Soul Link").withStyle(ChatFormatting.LIGHT_PURPLE),
                 Component.literal("Fresh run ready. Defeat the Ender Dragon and share every heartbeat."));
+        broadcast(Component.literal("New Soul Link run is ready. Good luck!").withStyle(ChatFormatting.GREEN));
     }
 
     public void endRun(SoulLinkState.Result result, String reason) {
@@ -862,6 +868,17 @@ public final class RunCoordinator {
 
     public boolean isLobbyProtected(ServerPlayer player) {
         return LobbyService.isIn(player);
+    }
+
+    /** Cancels all lobby damage and immediately returns players hit by void damage to the platform. */
+    public boolean shouldCancelLobbyDamage(ServerPlayer player, DamageSource source) {
+        if (!LobbyService.isIn(player)) {
+            return false;
+        }
+        if (source.is(DamageTypes.FELL_OUT_OF_WORLD)) {
+            LobbyService.teleport(this.server, player);
+        }
+        return true;
     }
 
     // ------------------------------------------------------------------------------------------------

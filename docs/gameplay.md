@@ -4,14 +4,14 @@
 
 Soul Link has four states:
 
-1. **Lobby:** players wait on a protected platform in a persistent void dimension. Falling below the platform returns a player to its spawn. The lobby survives every run.
+1. **Lobby:** players wait on a protected platform in a persistent void dimension. An invisible two-block barrier ring prevents routine walks off the edge; void damage returns a player to spawn immediately, with a five-second fall check as a backstop. The lobby survives every run.
 2. **Preparing:** the next run's worlds and spawn are generated in the background. The first run starts automatically as soon as it is ready. Later `/soullink start` requests wait for preparation and show phase-based progress; optional wider-area pregeneration continues in the live world.
 3. **Running:** everyone present enters the new Overworld. The timer begins and shared vitality is active. By default, the next world is prepared at the same time.
 4. **Ended:** defeat or victory is saved, and players remain in that run's world. `/soullink start` begins the next fresh run; `/soullink reset` abandons a running attempt and starts the next one. Both move players through the lobby during world replacement.
 
 The lobby is a persistent dimension, not a world that is created and deleted between attempts. It is the first-run waiting area and the safe transition space during replacement. Operators can use `/soullink stop` to abandon an active attempt and leave everyone waiting there. There is no teleport-only command that moves players to the lobby while keeping the run active.
 
-Players stay connected across transitions while [Terra Rasa](https://github.com/qwasdf-1/terra-rasa) handles the world replacement.
+Players see a world-swap notice before activation and a run-ready notice after they arrive. Players stay connected across transitions while [Terra Rasa](https://github.com/qwasdf-1/terra-rasa) handles the world replacement.
 
 ## Shared vitality
 
@@ -29,7 +29,7 @@ This is not shared inventory or shared equipment. Those modes are not implemente
 
 ## Defeat and victory
 
-Any participant death in a run dimension ends the run in defeat. Remaining participants become spectators; the dead participant is also put into spectator mode on respawn. The run also ends in defeat if shared health is depleted.
+Any participant death in a run dimension ends the run in defeat. Remaining participants become spectators; the dead participant is also put into spectator mode on respawn. The run also ends in defeat if shared health is depleted. The defeated world continues ticking so spectators can move and inspect it; victory worlds also remain live for vanilla portal and credits behavior.
 
 Defeating the Ender Dragon in the canonical End ends the run in victory. Players stay in the world, so vanilla's exit portal, credits, and return to the run spawn work normally. The timer stops at the result. Soul Link records total runs, victories, and the best victory time.
 

@@ -24,6 +24,25 @@ With a run in progress and nothing being prepared or swapped, Soul Link's own wo
 | Lobby fall rescue, every 5 ticks | about 1 µs |
 | Run-state save, every 100 ticks: a field copy on the server thread; serializing and writing happen on a writer thread, and only when something changed | under 1 µs |
 
+### Lobby platform ticket
+
+A focused 26.2 comparison used the pinned reference modpack (21 server-side
+mods), two idle headless clients, an active run, and no preparation or swap in
+progress. After a 10-second warmup, it sampled ten 5-second windows. The values
+below are the median of those window percentiles:
+
+| Soul Link lobby ticket | Server P50 | Server P95 | Server P99 | Lobby chunks loaded / block-ticking |
+|---|---:|---:|---:|---:|
+| Enabled | 4.35 ms | 6.6 ms | 8.5 ms | 25 / 1 |
+| Disabled | 4.5 ms | 7.15 ms | 8.85 ms | 25 / 1 |
+
+Soul Link's own idle tick cost was 15.9 µs mean and 101.5 µs p99 with the ticket
+enabled, and 15.8 µs mean and 111.8 µs p99 with it disabled. This single paired
+comparison found no measurable performance or chunk-count benefit from
+disabling the ticket. The reason the same chunks remained loaded without it was
+not identified; retain the ticket as an explicit guarantee that the lobby
+platform is available.
+
 Staged levels hold chunk tickets that load chunks without ticking them, so the next run's worlds never tick blocks or entities. Everything else is event-driven: damage, food, effects, deaths and joins.
 
 ### Preparing the next run
@@ -91,6 +110,6 @@ The run timer only counts while a participant is online, so an empty server does
 - **Modded worldgen** (Terralith, Tectonic, Incendium, Nullscape, Structory, and the worldgen rewrites C2ME, Fast Noise and Fast Surface): modded biomes appear in all three run dimensions; the prepared spawn equals the pack's own spawn for the seed; noise heights, biomes and structure starts equal a control server started with the same seed.
 - **Extra dimensions:** Deeper Dark, listed in `resettableDimensions`, is prepared with the run seed and replaced with the vanilla three, and its data-pack portal works after a reset. A Multiworld runtime dimension and the lobby are left untouched.
 - **Mods that cache levels:** Chunky kept the retired Overworld and silently "completed" tasks against it. Terra Rasa's adapter now cancels its tasks before a swap and rebinds its selection. No retired level stays reachable after garbage collection with the full pack.
-- **WTHIT and C2ME:** the server modpack test alone is insufficient because its headless clients do not send block-tooltip requests. On 2026-10-26, a rendered 26.2 Fabric client reproduced a server hang and player timeout during `/soullink reset` with WTHIT 20.0.0, Bad Packets 0.12.2, and C2ME 0.4.2-alpha.0.60. Soul Link moves players to the persistent lobby before replacing the run levels. The trace ran from WTHIT's `BlockDataRequestPlayC2SPacket` through `FluidStorageProvider` into chunk loading; C2ME logged repeated async read cancellations and a fallback that blocked loading old spawn chunk `[37,-19]`. Two controls completed normally: with C2ME removed and rendered WTHIT client requests present, the swap took 4.606 s; with C2ME present and WTHIT removed from the client (but still installed server-side), it took 5.952 s and the server remained responsive. In these tests, the failure required both C2ME and rendered-client WTHIT block-data traffic. Bytecode inspection found that WTHIT 20.0.0's singleton `FluidStorageProvider` keeps a `BlockApiCache`; its next request calls `getBlockEntity()` on the previous cache before replacing it for the new target. Since that cache can retain the retired `ServerLevel`, this is a plausible explanation for the access to the old spawn chunk, but the upstream root cause is not confirmed. The similar-sounding upstream [WTHIT issue #367](https://github.com/badasintended/wthit/issues/367) reports a client-side intermittent freeze in `TextileFluidDescriptor.getCauldronFluidData` while calling Fabric's `CauldronFluidContent.getForBlock`; our captured failure is in the server-side `FluidStorageProvider`/`BlockApiCache` path with C2ME chunk loading, so #367 does not establish the same cause. Keep this compatibility issue open; use a rendered-client transition to verify any fix. Test logs are under `build/integration/server-modpack/sessions/` (`wthit-client-manual`, `diagnose-no-c2me`, and `diagnose-c2me-no-wthit`).
+- **WTHIT and C2ME:** the server modpack test alone is insufficient because its headless clients do not send block-tooltip requests. On 2026-10-26, a rendered 26.2 Fabric client reproduced a server hang and player timeout during `/soullink reset` with WTHIT 20.0.0, Bad Packets 0.12.2, and C2ME 0.4.2-alpha.0.60. Soul Link moves players to the persistent lobby before replacing the run levels. The trace ran from WTHIT's `BlockDataRequestPlayC2SPacket` through `FluidStorageProvider` into chunk loading; C2ME logged repeated async read cancellations and a fallback that blocked loading old spawn chunk `[37,-19]`. Two controls completed normally: with C2ME removed and rendered WTHIT client requests present, the swap took 4.606 s; with C2ME present and WTHIT removed from the client (but still installed server-side), it took 5.952 s and the server remained responsive. In these tests, the failure required both C2ME and rendered-client WTHIT block-data traffic. Bytecode inspection found that WTHIT 20.0.0's singleton `FluidStorageProvider` keeps a `BlockApiCache`; its next request calls `getBlockEntity()` on the previous cache before replacing it for the new target. Since that cache can retain the retired `ServerLevel`, this is a plausible explanation for the access to the old spawn chunk, but the upstream root cause is not confirmed. The similar-sounding upstream [WTHIT issue #367](https://github.com/badasintended/wthit/issues/367) reports a client-side intermittent freeze in `TextileFluidDescriptor.getCauldronFluidData` while calling Fabric's `CauldronFluidContent.getForBlock`; our captured failure is in the server-side `FluidStorageProvider`/`BlockApiCache` path with C2ME chunk loading, so #367 does not establish the same cause. Keep this compatibility issue open; use a rendered-client transition to verify any fix.
 
 NoisiumForked has no stable 26.2 build yet, and Fast Noise declares itself incompatible with Moonrise, so neither is covered.
