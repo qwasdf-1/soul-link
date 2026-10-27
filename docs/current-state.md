@@ -9,6 +9,9 @@ toolchain versions live in `gradle/minecraft-targets.json`.
   outcomes, late-join handling, and restart recovery.
 - Persistent lobby, asynchronous preparation, optional pregeneration, and
   replacement of configured canonical dimensions through bundled Terra Rasa.
+- The lobby platform currently has a polished-blackstone edge, its platform
+  chunks are kept loaded by a small ticket, and a server tick check rescues lobby
+  players below Y=0 every five ticks.
 - A new server automatically starts its first run when the prepared spawn is
   ready; later runs still require `/soullink start`.
 - `/soullink help`, a consolidated command root with the old top-level aliases removed, readable
@@ -37,16 +40,16 @@ requests and C2ME during `/soullink reset`: the WTHIT client completed with C2ME
 and C2ME completed without WTHIT client requests (while its server integration
 remained installed). WTHIT's singleton fluid provider may dereference a cache
 bound to the retired run level. This is a leading hypothesis, not a confirmed
-root cause. See the [operations reference](reference.md) and local issue ledger.
+root cause. See the [operations reference](reference.md).
 Headless integration clients do not exercise WTHIT's block-tooltip packet.
 
 A separate operator log reported a Terra Rasa preparation timeout in `FLUSHING`.
 The matching start and failure timestamps are exactly 900 seconds apart,
 confirming the overall timeout fired. Source inspection found a likely edge
 case where reaching the deadline during pregeneration enters `FLUSHING`, then
-the next tick treats the expired deadline as fatal. See `SL-003` in the local
-issue ledger. The available Soul Link status predates preparation and no
-phase-level status was logged, so the phase at the deadline remains unknown.
+the next tick treats the expired deadline as fatal. The available Soul Link
+status predates preparation and no phase-level status was logged, so the phase
+at the deadline remains unknown.
 
 The repeated `Preparing worlds… 97%` messages were Terra Rasa's fixed display
 value for `FLUSHING`, sent by Soul Link every ten ticks. Preparation now shows
@@ -56,11 +59,22 @@ deadline; staged-level close and manifest publication retain bounded drain
 timeouts. Earlier required phases still fail at the overall deadline, which
 stops optional pregeneration. These changes are implemented but have not been
 verified in a server run. A separate Waystones `Items` NBT type warning came
-from C2ME worldgen; see `SL-004` in the local issue ledger.
+from C2ME worldgen.
 
 ## Requested work
 
-The post-run `/soullink start` destination question and live confirmation of half-heart
-composition remain open in `roadmap.md`. The new command, onboarding, damage,
-timeout, and progress behavior still need server verification; do not close
-their issue-ledger entries without operator confirmation.
+The post-run `/soullink start` destination question and live confirmation of
+half-heart composition remain open in `roadmap.md`. The new command, onboarding,
+damage, timeout, and progress behavior still need server verification.
+
+The chosen lobby-safety follow-up is a barrier perimeter, void-damage rescue,
+and a slow periodic rescue backstop. It is not implemented yet.
+
+Whole-lobby unloading and freezing ended dimensions are not implemented.
+The lobby remains a server dimension for transitions. Victory worlds remain
+playable so vanilla portal and credits behavior works. The desired defeat
+behavior is to stop world simulation while keeping spectator movement; the
+implementation needs to establish whether that can be done without disabling
+player ticks. A 26.2 two-client comparison showed no loaded-chunk or measurable
+tick-time reduction when Soul Link's lobby ticket was disabled; keep the ticket
+for now because its explicit platform-load guarantee remains useful.

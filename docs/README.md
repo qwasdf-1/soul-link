@@ -14,8 +14,7 @@
 | [Product and gameplay backlog](roadmap.md) | Requested onboarding, command experience, and gameplay-rule improvements awaiting implementation. |
 | [Publishing](publishing.md) | One GitHub release with a Modrinth version per supported Minecraft target. |
 
-Agent instructions are in the root [`AGENTS.md`](../AGENTS.md). The issue ledger,
-open-work list, TODO index, and work register are local operator records and are
-excluded per checkout.
+This map covers maintained product, architecture, compatibility, and release
+references.
 
 Source, tests, target configuration, and generated release assets are authoritative when prose differs. See [Terra Rasa](https://github.com/qwasdf-1/terra-rasa) for the separate library that prepares and replaces the worlds.

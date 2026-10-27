@@ -8,9 +8,6 @@
 | Reset, persistence, performance, compatibility | `reference.md` |
 | Product requests and open design questions | `roadmap.md` |
 | Release workflow | `publishing.md` |
-| Current operator-reported defects | Local `issue-ledger.md` |
-| Agent instructions | Root `AGENTS.md` (`CLAUDE.md` is a compatibility symlink) |
-| Local active work and backlog index | `open-work.md`, `TODOS.md`, `work-register.md` |
 
 Keep implementation statements in present tense and tied to code, tests, or
 release configuration. Keep requested behavior in the roadmap until it is

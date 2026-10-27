@@ -24,6 +24,25 @@ With a run in progress and nothing being prepared or swapped, Soul Link's own wo
 | Lobby fall rescue, every 5 ticks | about 1 µs |
 | Run-state save, every 100 ticks: a field copy on the server thread; serializing and writing happen on a writer thread, and only when something changed | under 1 µs |
 
+### Lobby platform ticket
+
+A focused 26.2 comparison used the pinned reference modpack (21 server-side
+mods), two idle headless clients, an active run, and no preparation or swap in
+progress. After a 10-second warmup, it sampled ten 5-second windows. The values
+below are the median of those window percentiles:
+
+| Soul Link lobby ticket | Server P50 | Server P95 | Server P99 | Lobby chunks loaded / block-ticking |
+|---|---:|---:|---:|---:|
+| Enabled | 4.35 ms | 6.6 ms | 8.5 ms | 25 / 1 |
+| Disabled | 4.5 ms | 7.15 ms | 8.85 ms | 25 / 1 |
+
+Soul Link's own idle tick cost was 15.9 µs mean and 101.5 µs p99 with the ticket
+enabled, and 15.8 µs mean and 111.8 µs p99 with it disabled. This single paired
+comparison found no measurable performance or chunk-count benefit from
+disabling the ticket. The reason the same chunks remained loaded without it was
+not identified; retain the ticket as an explicit guarantee that the lobby
+platform is available.
+
 Staged levels hold chunk tickets that load chunks without ticking them, so the next run's worlds never tick blocks or entities. Everything else is event-driven: damage, food, effects, deaths and joins.
 
 ### Preparing the next run
