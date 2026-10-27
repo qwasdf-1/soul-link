@@ -1,6 +1,6 @@
 # Soul Link
 
-Cooperative challenge runs for a Fabric dedicated server, inspired by the Soul Link format and similar co-op challenges. Players share health, hunger, and saturation; any participant's death ends the run, and defeating the Ender Dragon wins.
+Cooperative challenge runs for Fabric dedicated servers and integrated single-player/LAN worlds, inspired by the Soul Link format and similar co-op challenges. Players share health, hunger, and saturation; any participant's death ends the run, and defeating the Ender Dragon wins.
 
 Each run uses fresh, seeded Overworld, Nether, and End worlds while players stay connected in a persistent lobby. [Terra Rasa](https://github.com/qwasdf-1/terra-rasa) handles world preparation and replacement and is bundled in Soul Link's mod jar. Its [README](https://github.com/qwasdf-1/terra-rasa#terra-rasa) explains how canonical replacement keeps vanilla's world behavior intact.
 
@@ -15,7 +15,7 @@ Each run uses fresh, seeded Overworld, Nether, and End worlds while players stay
 - **Optional shared potions:** when enabled, ongoing effect gains, upgrades, removals, and expirations are mirrored to teammates. Instant healing and damage already flow through shared vitality.
 - **Optional half-heart runs:** limit participants and the shared health pool to one health point, with player max health restored when they return to the lobby.
 - **Operator controls:** pause the run timer without pausing gameplay, toggle vanilla natural regeneration, and configure optional pregeneration.
-- **Server-side only:** vanilla clients connect normally.
+- **Server-owned gameplay:** the host needs Soul Link installed for dedicated or integrated servers. LAN guests can connect with vanilla clients.
 
 ## Requirements and installation
 
@@ -44,7 +44,7 @@ cd ../soul-link
 ./gradlew build -Ploom_version=1.17.21 -Pminecraft_version=1.21.11 -Pfabric_loader_version=0.19.5 -Pfabric_api_version=0.141.6+1.21.11 -Pjava_version=21
 ```
 
-Place the jar matching the server version, named `build/libs/soullink-mc<game-version>-<mod-version>.jar`, and Fabric API in the dedicated server's `mods/` directory. For example, use `soullink-mc1.21.11-<mod-version>.jar` on 1.21.11 or `soullink-mc26.2-<mod-version>.jar` on 26.2. Terra Rasa is bundled; the lobby dimension and its platform are included, so no extra datapack or world setup is required.
+Place the jar matching the game version, named `build/libs/soullink-mc<game-version>-<mod-version>.jar`, and Fabric API in the dedicated server's `mods/` directory or the single-player host's `mods/` directory. For example, use `soullink-mc1.21.11-<mod-version>.jar` on 1.21.11 or `soullink-mc26.2-<mod-version>.jar` on 26.2. Terra Rasa is bundled; the lobby dimension and its platform are included, so no extra datapack or world setup is required.
 
 By default, Soul Link replaces the vanilla Overworld, Nether, and End. The lobby and any dimension not listed for replacement remain untouched. Mod or datapack dimensions used by the run can be added in `config/soullink.json`; details are in the [configuration guide](docs/configuration.md).
 

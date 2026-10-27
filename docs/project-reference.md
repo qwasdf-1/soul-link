@@ -22,7 +22,7 @@ for an unlisted release from a matching major/minor version.
   explicitly persistent dimensions remain loaded.
 - Terra Rasa prepares the next run and performs canonical world replacement.
   Soul Link owns the run state, player flow, rules, outcomes, and shared pool.
-- The mod runs on a dedicated server; vanilla clients are supported.
+- The mod runs on dedicated servers and integrated servers (single-player and LAN). LAN participants can connect with vanilla clients; the host runs the mod.
 
 ## Where truth lives
 

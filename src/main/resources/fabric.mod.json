@@ -3,14 +3,14 @@
   "id": "soullink",
   "version": "${version}",
   "name": "Soul Link",
-  "description": "Cooperative Soul Link speedruns on canonical, freshly seeded run dimensions with a persistent lobby.",
+  "description": "Cooperative Soul Link speedruns on dedicated servers and integrated single-player/LAN worlds.",
   "authors": ["Soul Link Contributors"],
   "license": "Apache-2.0",
   "contact": {
     "sources": "https://github.com/qwasdf-1/soul-link",
     "issues": "https://github.com/qwasdf-1/soul-link/issues"
   },
-  "environment": "server",
+  "environment": "*",
   "entrypoints": {
     "main": ["dev.soullink.SoulLinkInitializer"]
   },

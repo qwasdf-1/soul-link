@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.3.0
+
+### Added
+
+- Enable the shared server entrypoint on integrated-server hosts for single-player and LAN play across all six supported Minecraft targets. A rendered 26.2 single-player smoke test passed through first-run activation.
+
+### Changed
+
+- Publish each target as client-and-server compatible on Modrinth so the integrated-server host can install Soul Link in its client profile.
+- Bundle Terra Rasa 0.3.0, which enables the shared lifecycle entrypoint on integrated servers.
+
 ## 0.2.0
 
 - Add builds for Minecraft 1.21.11 and 26.1 through 26.3, with one release jar per game version.
