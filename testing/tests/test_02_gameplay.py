@@ -126,7 +126,7 @@ def test_any_death_ends_the_run_for_everyone(server, players):
 
 
 def test_status_command_for_players(server, players):
-    output = server.rcon("runinfo")
+    output = server.rcon("soullink info")
     assert "Status: RUNNING" in output
-    players[0].command("runinfo")
+    players[0].command("soullink info")
     players[0].wait_for_message("Status: RUNNING", timeout=10)

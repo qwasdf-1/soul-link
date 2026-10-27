@@ -16,6 +16,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import dev.soullink.SoulLink;
 import dev.soullink.SoulLinkConfig;
+import dev.soullink.MinecraftCompat;
 import dev.soullink.game.SharedEffects;
 import dev.soullink.game.SharedVitality;
 import dev.soullink.lobby.LobbyService;
@@ -39,12 +40,14 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.RandomSupport;
@@ -66,6 +69,7 @@ public final class RunCoordinator {
     private static final String LOBBY_STAMP = "lobby";
     private static final int PREPARE_RETRY_TICKS = 20 * 30;
     private static final int STATE_SAVE_INTERVAL_TICKS = 20 * 5;
+    private static final int PREPARATION_NOTICE_INTERVAL_TICKS = 20 * 30;
 
     /** The coordinator of the running server; set from server start to server stop. */
     private static @Nullable RunCoordinator active;
@@ -88,7 +92,10 @@ public final class RunCoordinator {
     private SoulLinkState state = new SoulLinkState();
     private long ticks;
     private long nextPrepareTick;
+    private long lastPreparationNoticeTick = Long.MIN_VALUE;
+    private @Nullable String lastPreparationNotice;
     private @Nullable String lastActivationError;
+    private @Nullable String lastReportedPreparationFailure;
     /** Vanilla's own world spawn as found at startup, before Soul Link points it at the lobby. */
     private LevelData.@Nullable RespawnData startupSpawn;
 
@@ -106,6 +113,7 @@ public final class RunCoordinator {
         this.preparation = new WorldPreparationService(this.paths, config.preloadRadius, config.pregenerationRadii(),
                 Duration.ofSeconds(config.preparationTimeoutSeconds), Duration.ofSeconds(config.drainTimeoutSeconds),
                 player -> LobbyService.teleport(server, player));
+        this.preparation.setReadyLimit(config.preparedRunPoolSize);
         this.activation = new CanonicalActivationService(this.paths, Duration.ofSeconds(config.drainTimeoutSeconds));
     }
 
@@ -133,6 +141,12 @@ public final class RunCoordinator {
         } else {
             this.server.setRespawnData(LobbyService.respawnData(this.server));
         }
+        // On a fresh server, preparation doubles as the initial start request. tickStarting() enters the
+        // first run as soon as its spawn is ready; subsequent runs still wait for /soullink start.
+        if (this.state.status == SoulLinkState.Status.LOBBY && this.state.runsStarted == 0
+                && this.state.activeRunId == null) {
+            this.state.status = SoulLinkState.Status.STARTING;
+        }
         save();
         SoulLink.LOGGER.info("Soul Link ready: status {}, active run {}, prepared run {}", this.state.status,
                 this.state.activeRunId, this.preparation.ready().map(m -> m.runId).orElse("none"));
@@ -141,14 +155,13 @@ public final class RunCoordinator {
     /** A prepared run is only valid for the data packs it was generated under (spec 8.6, test T17). */
     public void onDataPacksReloaded() {
         String fingerprint = RegistryFingerprint.compute(this.server, this.policy);
-        this.preparation.ready().ifPresent(manifest -> {
+        for (RunManifest manifest : this.preparation.readyRuns()) {
             if (!fingerprint.equals(manifest.fingerprint)) {
                 SoulLink.LOGGER.info("Data packs changed; discarding prepared run {}", manifest.runId);
-                this.preparation.takeReady();
-                this.preparation.deleteStageData(manifest.runUuid());
+                this.preparation.discardReady(manifest.runUuid());
                 this.nextPrepareTick = 0;
             }
-        });
+        }
         String active = this.preparation.activeFingerprint();
         if (active != null && !fingerprint.equals(active)) {
             this.preparation.fail(this.server, "data packs changed during preparation");
@@ -157,6 +170,7 @@ public final class RunCoordinator {
     }
 
     public void onServerStopping() {
+        this.preparation.onServerStopping(this.server);
         save();
         this.stateWriter.close();
     }
@@ -198,16 +212,29 @@ public final class RunCoordinator {
 
     private void tickWork() {
         this.ticks++;
+        int readyBefore = this.preparation.readyCount();
         this.preparation.tick(this.server);
+        reportNewPreparationFailure();
+        if (this.preparation.readyCount() > readyBefore
+                && this.state.status != SoulLinkState.Status.STARTING) {
+            String readyMessage = this.preparation.readyCount() + " of " + this.preparation.readyLimit()
+                    + " future run worlds are ready; start the next with /soullink start.";
+            SoulLink.LOGGER.info(readyMessage);
+            sendOperatorNotice(Component.literal(readyMessage)
+                    .withStyle(ChatFormatting.GREEN));
+        }
         switch (this.state.status) {
             case STARTING -> tickStarting();
             case RUNNING -> tickRunning();
             default -> {
             }
         }
+        if (this.state.status != SoulLinkState.Status.STARTING) {
+            reportBackgroundPreparationProgress();
+        }
         rescueLobbyFallers();
         if (this.config.autoPrepare && this.state.status != SoulLinkState.Status.STARTING && this.ticks >= this.nextPrepareTick
-                && !this.preparation.isPreparing() && this.preparation.ready().isEmpty()) {
+                && !this.preparation.isPreparing() && this.preparation.readyCount() < this.preparation.readyLimit()) {
             beginPreparation(null);
         }
         if (this.ticks % STATE_SAVE_INTERVAL_TICKS == 0) {
@@ -227,16 +254,13 @@ public final class RunCoordinator {
         if (!this.preparation.isPreparing() && this.ticks >= this.nextPrepareTick) {
             beginPreparation(null);
         }
-        if (this.ticks % 10 == 0) {
-            int percent = Math.round(this.preparation.progress() * 100.0F);
-            actionBarAll(Component.literal("Preparing worlds… " + percent + "%").withStyle(ChatFormatting.GRAY));
-        }
+        reportPreparationProgress(true);
     }
 
     private void tickRunning() {
         // The run clock only runs while someone is playing it: not while the server waits for players to
         // come back after a restart, and not while everyone has disconnected.
-        if (!onlineParticipants().isEmpty()) {
+        if (!this.state.timerPaused && !onlineParticipants().isEmpty()) {
             this.state.elapsedTicks++;
         }
         List<ServerPlayer> participants = activeParticipants();
@@ -251,7 +275,10 @@ public final class RunCoordinator {
         this.state.sharedFood = this.vitality.food();
         this.state.sharedSaturation = this.vitality.saturation();
         if (this.ticks % 10 == 0) {
-            Component timer = Component.literal(RunTimer.format(this.state.elapsedTicks)).withStyle(ChatFormatting.GOLD);
+            String display = this.state.timerPaused
+                    ? "Paused — " + RunTimer.format(this.state.elapsedTicks)
+                    : RunTimer.format(this.state.elapsedTicks);
+            Component timer = Component.literal(display).withStyle(ChatFormatting.GOLD);
             for (ServerPlayer player : onlineParticipants()) {
                 player.sendSystemMessage(timer, true);
             }
@@ -272,10 +299,10 @@ public final class RunCoordinator {
     // ------------------------------------------------------------------------------------------------
     // Commands
 
-    /** {@code /start}: enter a prepared run now, or as soon as preparation finishes. */
+    /** {@code /soullink start}: enter a prepared run now, or as soon as preparation finishes. */
     public Component requestStart() {
         if (this.state.status == SoulLinkState.Status.RUNNING) {
-            return Component.literal("A run is already in progress. Use /reset to restart it.").withStyle(ChatFormatting.RED);
+            return Component.literal("A run is already in progress. Use /soullink reset to restart it.").withStyle(ChatFormatting.RED);
         }
         if (this.state.status == SoulLinkState.Status.STARTING) {
             return Component.literal("The next run is already being prepared.");
@@ -297,7 +324,7 @@ public final class RunCoordinator {
         return Component.literal("Preparing a fresh world; the run starts automatically when it is ready.");
     }
 
-    /** {@code /reset}: abandon the current run and start the next one. */
+    /** {@code /soullink reset}: abandon the current run and start the next one. */
     public Component requestReset() {
         if (this.state.status == SoulLinkState.Status.RUNNING) {
             endRun(SoulLinkState.Result.ABANDONED, "the run was reset");
@@ -305,26 +332,53 @@ public final class RunCoordinator {
         return requestStart();
     }
 
-    /** {@code /stoprun}: end the run and return everyone to the lobby. */
+    /** {@code /soullink stop}: end the run and return everyone to the lobby. */
     public Component stopRun() {
         if (this.state.status == SoulLinkState.Status.RUNNING) {
             endRun(SoulLinkState.Result.ABANDONED, "the run was stopped");
         }
         this.state.status = SoulLinkState.Status.LOBBY;
+        this.state.timerPaused = false;
         moveEveryoneToLobby();
         save();
         return Component.literal("Run stopped; everyone is back in the lobby.");
     }
 
+    public Component pauseTimer() {
+        if (this.state.status != SoulLinkState.Status.RUNNING) {
+            return Component.literal("A run is not in progress.").withStyle(ChatFormatting.RED);
+        }
+        if (this.state.timerPaused) {
+            return Component.literal("The run timer is already paused.");
+        }
+        this.state.timerPaused = true;
+        save();
+        broadcast(Component.literal("The run timer is paused. Gameplay continues normally."));
+        return Component.literal("Run timer paused; the world and gameplay continue normally.");
+    }
+
+    public Component resumeTimer() {
+        if (this.state.status != SoulLinkState.Status.RUNNING) {
+            return Component.literal("A run is not in progress.").withStyle(ChatFormatting.RED);
+        }
+        if (!this.state.timerPaused) {
+            return Component.literal("The run timer is not paused.");
+        }
+        this.state.timerPaused = false;
+        save();
+        broadcast(Component.literal("The run timer has resumed."));
+        return Component.literal("Run timer resumed.");
+    }
+
     /** {@code /soullink prepare [seed]}: discard any prepared run and prepare a new one. */
     public Component prepare(@Nullable Long seed, @Nullable Integer preloadRadius) {
         if (this.preparation.isPreparing()) {
-            this.preparation.fail(this.server, "replaced by an explicit prepare request");
+            String message = this.state.status == SoulLinkState.Status.STARTING
+                    ? "The automatic run is already preparing to start. Wait until it enters play before preparing a replacement."
+                    : "A future run is already being prepared. Wait for it to finish before replacing the prepared run pool.";
+            return Component.literal(message).withStyle(ChatFormatting.RED);
         }
-        this.preparation.ready().ifPresent(manifest -> {
-            this.preparation.takeReady();
-            this.preparation.deleteStageData(manifest.runUuid());
-        });
+        this.preparation.discardAllReady();
         this.nextPrepareTick = Long.MAX_VALUE;
         boolean started = beginPreparation(seed, preloadRadius);
         this.nextPrepareTick = this.ticks + PREPARE_RETRY_TICKS;
@@ -347,11 +401,61 @@ public final class RunCoordinator {
             } else {
                 this.preparation.begin(this.server, chosen, this.policy);
             }
+            this.lastReportedPreparationFailure = null;
+            this.lastPreparationNotice = null;
+            this.lastPreparationNoticeTick = Long.MIN_VALUE;
             return true;
         } catch (LifecycleException e) {
             SoulLink.LOGGER.error("Could not begin run preparation", e);
             this.nextPrepareTick = this.ticks + PREPARE_RETRY_TICKS;
             return false;
+        }
+    }
+
+    private void reportNewPreparationFailure() {
+        String failure = this.preparation.lastFailure();
+        if (failure == null || failure.equals(this.lastReportedPreparationFailure)) {
+            return;
+        }
+        this.lastReportedPreparationFailure = failure;
+        Component message = Component.literal("Soul Link run preparation failed: " + failure
+                + ". Check the server log; recovery: run /soullink prepare. Report bugs at "
+                + "https://github.com/qwasdf-1/soul-link/issues")
+                .withStyle(ChatFormatting.RED);
+        sendOperatorNotice(message);
+    }
+
+    private void reportBackgroundPreparationProgress() {
+        if (this.preparation.isPreparing()) {
+            reportPreparationProgress(false);
+        }
+    }
+
+    private void reportPreparationProgress(boolean toAllPlayers) {
+        if (!this.preparation.isPreparing()) {
+            return;
+        }
+        String message = this.preparation.progressDescription();
+        String phase = message.startsWith("Pregenerating run worlds…") ? "Pregenerating run worlds…" : message;
+        if (!phase.equals(this.lastPreparationNotice)
+                || this.ticks - this.lastPreparationNoticeTick >= PREPARATION_NOTICE_INTERVAL_TICKS) {
+            SoulLink.LOGGER.info("Run preparation: {}", message);
+            Component component = Component.literal(message).withStyle(ChatFormatting.GRAY);
+            if (toAllPlayers) {
+                actionBarAll(component);
+            } else {
+                sendOperatorNotice(component);
+            }
+            this.lastPreparationNotice = phase;
+            this.lastPreparationNoticeTick = this.ticks;
+        }
+    }
+
+    private void sendOperatorNotice(Component message) {
+        for (ServerPlayer player : this.server.getPlayerList().getPlayers()) {
+            if (MinecraftCompat.hasOperatorPermission(player)) {
+                player.sendSystemMessage(message, false);
+            }
         }
     }
 
@@ -386,7 +490,8 @@ public final class RunCoordinator {
         save();
         // Start the next run's preparation while everyone still waits in the lobby: building its levels is
         // the one step that cannot be spread over ticks, so it belongs in this pause, not in the run.
-        if (this.config.autoPrepare && !this.preparation.isPreparing() && this.preparation.ready().isEmpty()
+        if (this.config.autoPrepare && !this.preparation.isPreparing()
+                && this.preparation.readyCount() < this.preparation.readyLimit()
                 && beginPreparation(null)) {
             this.preparation.constructNow(this.server);
         }
@@ -404,16 +509,30 @@ public final class RunCoordinator {
         String runId = this.state.activeRunId;
         BlockPos spawn = runSpawn();
         this.server.setRespawnData(runRespawnData());
-        this.vitality.reset(20.0F);
+        this.vitality.reset(this.config.halfHeart ? 1.0F : 20.0F);
+        this.state.sharedHealth = this.vitality.health();
         this.state.sharedPotions = this.config.sharedPotions;
+        this.state.halfHeart = this.config.halfHeart;
+        this.state.playerMaxHealthBases.clear();
+        this.state.timerPaused = false;
         this.state.participants.clear();
         ServerLevel overworld = this.server.overworld();
         for (ServerPlayer player : List.copyOf(this.server.getPlayerList().getPlayers())) {
             SessionReset.resetPlayer(this.server, player, GameType.SURVIVAL);
+            if (this.state.halfHeart) {
+                rememberMaxHealthBase(player);
+            }
             player.teleport(new TeleportTransition(overworld, spawnPointFor(player, overworld, spawn), Vec3.ZERO, 0.0F, 0.0F,
                     TeleportTransition.DO_NOTHING));
             this.state.participants.add(player.getUUID().toString());
             this.state.playerRuns.put(player.getUUID().toString(), runId);
+        }
+        if (this.state.halfHeart) {
+            // Save restoration values before lowering max health, so a crash mid-transition can recover.
+            save();
+            for (ServerPlayer player : List.copyOf(this.server.getPlayerList().getPlayers())) {
+                applyHalfHeart(player);
+            }
         }
         syncParticipantIds();
         this.state.status = SoulLinkState.Status.RUNNING;
@@ -427,7 +546,7 @@ public final class RunCoordinator {
         // as they were in the lobby. A handful of small files, once per run.
         this.server.getPlayerList().saveAll();
         title(Component.literal("Soul Link").withStyle(ChatFormatting.LIGHT_PURPLE),
-                Component.literal("Defeat the Ender Dragon. Share every heartbeat."));
+                Component.literal("Fresh run ready. Defeat the Ender Dragon and share every heartbeat."));
     }
 
     public void endRun(SoulLinkState.Result result, String reason) {
@@ -435,6 +554,7 @@ public final class RunCoordinator {
             return;
         }
         this.state.status = SoulLinkState.Status.ENDED;
+        this.state.timerPaused = false;
         this.state.result = result;
         this.state.endReason = reason;
         String time = RunTimer.format(this.state.elapsedTicks);
@@ -459,7 +579,7 @@ public final class RunCoordinator {
         title(Component.literal(victory ? "Victory!" : "Run failed").withStyle(victory ? ChatFormatting.GOLD : ChatFormatting.RED),
                 Component.literal(time));
         MutableComponent next = Component.literal("[Start next run]").withStyle(Style.EMPTY.withColor(ChatFormatting.GREEN)
-                .withClickEvent(new ClickEvent.RunCommand("/start"))
+                .withClickEvent(new ClickEvent.RunCommand("/soullink start"))
                 .withHoverEvent(new HoverEvent.ShowText(Component.literal("Generate a fresh world and start"))));
         broadcast(Component.literal((victory ? "The dragon is dead! " : "Run over: " + reason + ". ") + "Time: " + time + " ")
                 .append(next));
@@ -477,6 +597,7 @@ public final class RunCoordinator {
         if (current.isDeadOrDying() || current.isRemoved()) {
             current = this.server.getPlayerList().respawn(current, false, Entity.RemovalReason.KILLED);
         }
+        restoreMaxHealthBase(current);
         SessionReset.resetPlayer(this.server, current, GameType.ADVENTURE);
         if (!LobbyService.isIn(current)) {
             current = LobbyService.teleport(this.server, current);
@@ -490,6 +611,7 @@ public final class RunCoordinator {
     // Gameplay events
 
     public void onPlayerJoin(ServerPlayer player) {
+        sendOperatorOnboarding(player);
         String uuid = player.getUUID().toString();
         String stamp = this.state.playerRuns.get(uuid);
         boolean currentParticipant = this.state.participants.contains(uuid) && this.state.activeRunId != null
@@ -507,8 +629,14 @@ public final class RunCoordinator {
                                 Vec3.ZERO, 0.0F, 0.0F, TeleportTransition.DO_NOTHING));
                         player.setGameMode(GameType.SURVIVAL);
                     }
+                    applyHalfHeart(player);
                 } else if (this.config.allowLateJoin) {
                     SessionReset.resetPlayer(this.server, player, GameType.SURVIVAL);
+                    if (this.state.halfHeart) {
+                        rememberMaxHealthBase(player);
+                        save();
+                        applyHalfHeart(player);
+                    }
                     ServerLevel overworld = this.server.overworld();
                     player.teleport(new TeleportTransition(overworld, spawnPointFor(player, overworld, runSpawn()),
                             Vec3.ZERO, 0.0F, 0.0F, TeleportTransition.DO_NOTHING));
@@ -524,7 +652,7 @@ public final class RunCoordinator {
                 }
             }
             case ENDED -> {
-                if (!currentParticipant) {
+                if (!currentParticipant || !this.state.activeRunStarted) {
                     sendToLobby(player);
                 } else if (this.state.result != SoulLinkState.Result.VICTORY) {
                     player.setGameMode(GameType.SPECTATOR);
@@ -536,6 +664,21 @@ public final class RunCoordinator {
                 }
             }
         }
+    }
+
+    private void sendOperatorOnboarding(ServerPlayer player) {
+        if (!MinecraftCompat.hasOperatorPermission(player) || this.state.onboardedOperators.contains(player.getUUID().toString())) {
+            return;
+        }
+        player.sendSystemMessage(Component.literal("Soul Link is cooperative: players share health, hunger, and saturation. "
+                + "Damage adds together; simultaneous healing only applies the largest individual heal. A participant death "
+                + "or an empty shared health pool ends the run; defeat the Ender Dragon to win."));
+        player.sendSystemMessage(Component.literal("Each run uses a fresh world. The first run starts automatically once its "
+                + "spawn is ready; later runs use /soullink start."));
+        player.sendSystemMessage(Component.literal("Use /soullink help for commands. Operators can inspect /soullink status "
+                + "and configure pregeneration with /soullink setup."));
+        this.state.onboardedOperators.add(player.getUUID().toString());
+        save();
     }
 
     public void onPlayerLeave(ServerPlayer player) {
@@ -550,6 +693,7 @@ public final class RunCoordinator {
 
     public void onPlayerRespawn(ServerPlayer player) {
         switch (this.state.status) {
+            case RUNNING -> applyHalfHeart(player);
             case ENDED -> {
                 // A victorious participant returning through the exit portal keeps playing.
                 if (isParticipant(player) && this.state.result != SoulLinkState.Result.VICTORY) {
@@ -599,6 +743,121 @@ public final class RunCoordinator {
             return Component.literal("Could not save the config: " + e.getMessage()).withStyle(ChatFormatting.RED);
         }
         return Component.literal("Shared potions " + (enabled ? "on" : "off") + " from the next run.");
+    }
+
+    /** Changes vanilla's world-persisted naturalRegeneration rule immediately. */
+    public Component setNaturalRegeneration(boolean enabled) {
+        MinecraftCompat.setNaturalRegeneration(this.server, enabled);
+        return Component.literal("Natural regeneration " + (enabled ? "enabled" : "disabled") + ".");
+    }
+
+    /** Persists the half-heart setting for the next run. */
+    public Component setHalfHeart(boolean enabled) {
+        boolean previous = this.config.halfHeart;
+        this.config.halfHeart = enabled;
+        try {
+            this.config.save(SoulLink.configPath());
+        } catch (IOException e) {
+            this.config.halfHeart = previous;
+            SoulLink.LOGGER.error("Could not save the Soul Link config", e);
+            return Component.literal("Could not save the config: " + e.getMessage()).withStyle(ChatFormatting.RED);
+        }
+        return Component.literal("Half-heart mode " + (enabled ? "on" : "off") + " from the next run.");
+    }
+
+    private void rememberMaxHealthBase(ServerPlayer player) {
+        var attribute = player.getAttribute(Attributes.MAX_HEALTH);
+        if (attribute != null) {
+            this.state.playerMaxHealthBases.putIfAbsent(player.getUUID().toString(), attribute.getBaseValue());
+        }
+    }
+
+    private void applyHalfHeart(ServerPlayer player) {
+        if (!this.state.halfHeart) {
+            return;
+        }
+        var attribute = player.getAttribute(Attributes.MAX_HEALTH);
+        if (attribute != null && attribute.getBaseValue() != 1.0) {
+            attribute.setBaseValue(1.0);
+        }
+        if (player.getHealth() > 1.0F) {
+            player.setHealth(1.0F);
+        }
+    }
+
+    private void restoreMaxHealthBase(ServerPlayer player) {
+        Double baseValue = this.state.playerMaxHealthBases.remove(player.getUUID().toString());
+        var attribute = player.getAttribute(Attributes.MAX_HEALTH);
+        if (baseValue != null && attribute != null) {
+            attribute.setBaseValue(baseValue);
+        }
+    }
+
+    public Component setupInfo() {
+        StringBuilder info = new StringBuilder("Soul Link setup\nOptional pregeneration radii (blocks):");
+        for (Identifier dimension : this.policy.resettable()) {
+            int radius = this.config.pregeneration.getOrDefault(dimension.toString(), 0);
+            info.append("\n  ").append(dimension).append(": ").append(radius == 0 ? "off" : radius);
+        }
+        info.append("\nPrepared future runs: ").append(this.preparation.readyCount()).append(" / ")
+                .append(this.preparation.readyLimit())
+                .append(" (the active run is not counted; maximum ")
+                .append(WorldPreparationService.MAX_READY_RUNS).append(").")
+                .append("\nSet the pool size with /soullink setup pool <futureRuns>.")
+                .append("\nSet a radius with /soullink setup pregen <dimension> <radiusBlocks>; 0 disables it.")
+                .append("\nChanges apply to preparations begun after the setting is changed.")
+                .append("\nautoPrepare controls whether Soul Link fills the pool in the background.");
+        return Component.literal(info.toString());
+    }
+
+    public Component setPreparedRunPoolSize(int futureRuns) {
+        if (futureRuns < 1 || futureRuns > WorldPreparationService.MAX_READY_RUNS) {
+            return Component.literal("The future run pool size must be between 1 and "
+                    + WorldPreparationService.MAX_READY_RUNS + ".").withStyle(ChatFormatting.RED);
+        }
+        int previous = this.config.preparedRunPoolSize;
+        this.config.preparedRunPoolSize = futureRuns;
+        try {
+            this.config.save(SoulLink.configPath());
+        } catch (IOException e) {
+            this.config.preparedRunPoolSize = previous;
+            SoulLink.LOGGER.error("Could not save the Soul Link config", e);
+            return Component.literal("Could not save the prepared run pool setting: " + e.getMessage())
+                    .withStyle(ChatFormatting.RED);
+        }
+        this.preparation.setReadyLimit(futureRuns);
+        return Component.literal("Prepared future run pool set to " + futureRuns
+                + "; the active run does not count. Existing newest queued runs are discarded if the pool shrinks.");
+    }
+
+    public Component setPregenerationRadius(String dimensionName, int radiusBlocks) {
+        Identifier dimension;
+        try {
+            dimension = Identifier.parse(dimensionName);
+        } catch (RuntimeException e) {
+            return Component.literal("Invalid dimension id: " + dimensionName).withStyle(ChatFormatting.RED);
+        }
+        if (!this.policy.resettable().contains(dimension)) {
+            return Component.literal("" + dimension + " is not a resettable run dimension.").withStyle(ChatFormatting.RED);
+        }
+        if (radiusBlocks < 0 || radiusBlocks > 4096) {
+            return Component.literal("Pregeneration radius must be between 0 and 4096 blocks.").withStyle(ChatFormatting.RED);
+        }
+        var updated = new java.util.LinkedHashMap<>(this.config.pregeneration);
+        updated.put(dimension.toString(), radiusBlocks);
+        var previous = this.config.pregeneration;
+        this.config.pregeneration = updated;
+        try {
+            this.config.save(SoulLink.configPath());
+        } catch (IOException e) {
+            this.config.pregeneration = previous;
+            SoulLink.LOGGER.error("Could not save the Soul Link config", e);
+            return Component.literal("Could not save the pregeneration setting: " + e.getMessage())
+                    .withStyle(ChatFormatting.RED);
+        }
+        this.preparation.setPregenerationRadii(this.config.pregenerationRadii());
+        return Component.literal("Pregeneration for " + dimension + " set to "
+                + (radiusBlocks == 0 ? "off" : radiusBlocks + " blocks") + " for new preparations.");
     }
 
     public boolean isLobbyProtected(ServerPlayer player) {
@@ -708,16 +967,56 @@ public final class RunCoordinator {
         if (this.state.activeRunId != null) {
             info.append(" | Run ").append(this.state.activeRunId, 0, 8);
         }
-        info.append(" | Time ").append(RunTimer.format(this.state.elapsedTicks));
+        info.append(" | Time ").append(this.state.timerPaused ? "Paused — " : "")
+                .append(RunTimer.format(this.state.elapsedTicks));
         if (this.state.status == SoulLinkState.Status.RUNNING) {
             info.append(String.format(" | Health %.1f Food %d", this.vitality.health(), this.vitality.food()));
         }
-        info.append(" | Next world: ").append(this.preparation.ready().isPresent() ? "ready"
-                : this.preparation.isPreparing() ? Math.round(this.preparation.progress() * 100) + "%" : "not prepared");
+        info.append(" | Next world: ").append(this.preparation.progressDescription());
+        info.append(" | Prepared: ").append(this.preparation.readyCount()).append('/')
+                .append(this.preparation.readyLimit());
         if (this.state.bestVictoryTicks != null) {
             info.append(" | Best ").append(RunTimer.format(this.state.bestVictoryTicks));
         }
         return info.toString();
+    }
+
+    /** Readable operator status; raw JSON remains available under the debug command. */
+    public Component statusInfo() {
+        StringBuilder info = new StringBuilder("Soul Link status\n")
+                .append("State: ").append(this.state.status);
+        if (this.state.activeRunId != null) {
+            info.append("\nRun: ").append(this.state.activeRunId, 0, Math.min(8, this.state.activeRunId.length()));
+        }
+        info.append("\nElapsed: ").append(RunTimer.format(this.state.elapsedTicks));
+        if (this.state.timerPaused) {
+            info.append(" (timer paused; gameplay continues)");
+        }
+        info.append("\nParticipants: ").append(onlineParticipants().size()).append(" online / ")
+                .append(this.state.participants.size()).append(" in this run");
+        info.append("\nPrepared future runs: ").append(this.preparation.readyCount()).append(" / ")
+                .append(this.preparation.readyLimit());
+        if (this.state.status == SoulLinkState.Status.RUNNING) {
+            info.append(String.format("\nShared health: %.1f | Food: %d", this.vitality.health(), this.vitality.food()));
+        }
+        info.append("\nShared potions: current run ").append(this.state.sharedPotions ? "on" : "off")
+                .append(", next run ").append(this.config.sharedPotions ? "on" : "off");
+        info.append("\nHalf-heart: current run ").append(this.state.halfHeart ? "on" : "off")
+                .append(", next run ").append(this.config.halfHeart ? "on" : "off");
+        info.append("\nNext world: ").append(this.preparation.progressDescription());
+        info.append("\nNatural regeneration: ")
+                .append(MinecraftCompat.naturalRegeneration(this.server) ? "enabled" : "disabled");
+        if (this.state.bestVictoryTicks != null) {
+            info.append("\nBest time: ").append(RunTimer.format(this.state.bestVictoryTicks));
+        }
+        if (this.lastActivationError != null) {
+            info.append("\nLast activation error: ").append(this.lastActivationError);
+        }
+        if (this.preparation.lastFailure() != null) {
+            info.append("\nLast preparation error: ").append(this.preparation.lastFailure())
+                    .append("\nRecovery: check the server log, then try /soullink prepare.");
+        }
+        return Component.literal(info.toString());
     }
 
     /** Machine-readable lifecycle dump for {@code /soullink debug lifecycle} (spec 9.1). */
@@ -731,7 +1030,7 @@ public final class RunCoordinator {
         json.addProperty("activeRunId", this.state.activeRunId);
         json.addProperty("activeRunStarted", this.state.activeRunStarted);
         json.addProperty("runSeed", this.state.seed);
-        json.addProperty("globalSeed", this.server.getWorldGenSettings().options().seed());
+        json.addProperty("globalSeed", MinecraftCompat.globalSeed(this.server));
         json.addProperty("overworldSeed", this.server.overworld().getSeed());
         JsonArray spawn = new JsonArray();
         spawn.add(this.state.spawnX);
@@ -747,6 +1046,7 @@ public final class RunCoordinator {
             json.add("startupSpawn", startup);
         }
         json.addProperty("elapsedTicks", this.state.elapsedTicks);
+        json.addProperty("timerPaused", this.state.timerPaused);
         JsonArray participants = new JsonArray();
         this.state.participants.forEach(participants::add);
         json.add("participants", participants);
@@ -757,9 +1057,12 @@ public final class RunCoordinator {
         json.add("shared", shared);
         JsonObject rules = new JsonObject();
         rules.addProperty("sharedPotions", this.state.sharedPotions);
+        rules.addProperty("halfHeart", this.state.halfHeart);
+        rules.addProperty("naturalRegeneration", MinecraftCompat.naturalRegeneration(this.server));
         json.add("rules", rules);
         JsonObject nextRules = new JsonObject();
         nextRules.addProperty("sharedPotions", this.config.sharedPotions);
+        nextRules.addProperty("halfHeart", this.config.halfHeart);
         json.add("nextRules", nextRules);
         json.add("tickCost", this.tickCost.describe());
         json.addProperty("runsStarted", this.state.runsStarted);

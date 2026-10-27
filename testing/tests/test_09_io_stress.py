@@ -92,7 +92,7 @@ def test_failed_reset_under_load_reopens_everything_retirement_wrote(server, pla
     server.wait_prepared()
 
     server.rcon("soullink debug fail validate")
-    output = server.rcon("reset")
+    output = server.rcon("soullink reset")
     assert "rolled back" in output, output
     status = server.status()
     print("retirement under load, timings:", status["activation"]["lastTimingsMillis"])
@@ -121,11 +121,11 @@ def test_reset_under_load_promotes_intact_worlds(server, players):
     # The restored world still has its forceloads: generation resumes at startup.
     status = server.status()
     assert status["status"] == "LOBBY"
-    status = start_run(server, players, command="reset")
+    status = start_run(server, players, command="soullink reset")
     print("activation under load, timings:", status["activation"]["lastTimingsMillis"])
     load_up(server, status["spawn"])
     server.wait_prepared()
-    status = start_run(server, players, command="reset")
+    status = start_run(server, players, command="soullink reset")
     print("activation under load, timings:", status["activation"]["lastTimingsMillis"])
     for bot in players:
         bot.assert_connected()

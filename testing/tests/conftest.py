@@ -29,8 +29,8 @@ def server(env, request):
                             getattr(module, "LEVEL_SEED", DEFAULT_LEVEL_SEED))
     process.start()
     yield process
-    problems = process.suspicious_lines(allow=getattr(module, "ALLOWED_LOG", ()))
     process.stop()
+    problems = process.suspicious_lines(allow=getattr(module, "ALLOWED_LOG", ()))
     assert not problems, "unexpected errors in the server log:\n" + "\n".join(problems)
 
 

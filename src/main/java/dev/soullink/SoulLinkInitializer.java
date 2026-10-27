@@ -47,7 +47,9 @@ public final class SoulLinkInitializer implements ModInitializer {
                 coordinator.onDataPacksReloaded();
             }
         });
-        ServerLifecycleEvents.SERVER_STOPPED.register(server -> RunCoordinator.setActive(null));
+        ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
+            RunCoordinator.setActive(null);
+        });
 
         // World lifecycle work runs at the end of a server tick: outside level iteration and packet handling.
         ServerTickEvents.END_SERVER_TICK.register(server -> {

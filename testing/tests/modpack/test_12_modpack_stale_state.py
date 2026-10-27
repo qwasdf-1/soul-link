@@ -44,7 +44,7 @@ def test_running_chunky_task_is_cancelled_before_its_world_is_retired(server, pl
     assert "Task started" in server.rcon("chunky start")
     time.sleep(3)
     assert not chunky_idle(server)
-    start_run(server, players, command="reset", timeout=400)
+    start_run(server, players, command="soullink reset", timeout=400)
     assert any("Cancelled the Chunky task in minecraft:overworld" in line for line in server.lines)
     assert chunky_idle(server)
 
@@ -61,9 +61,12 @@ def test_chunky_after_a_reset_generates_in_the_live_world(server, players):
 
 
 def test_repeated_swaps_release_every_retired_level(server, players):
+    # The reference pack includes WTHIT and Bad Packets, so their server hooks are present through each
+    # transition. These protocol-only bots do not send WTHIT's client tooltip request; a playtest with a
+    # WTHIT-enabled client is still needed to reproduce that exact packet path.
     timings = []
     for _ in range(4):
-        status = start_run(server, players, command="reset", timeout=400)
+        status = start_run(server, players, command="soullink reset", timeout=400)
         timings.append(status["activation"]["lastTimingsMillis"])
     print("activation timings with the reference pack:", timings)
     for bot in players:

@@ -5,35 +5,60 @@ from __future__ import annotations
 import json
 import time
 
-from helpers import LOBBY, OVERWORLD, levels, start_run, wait_true
+from helpers import LOBBY, OVERWORLD, levels, start_run, wait_preparation_idle, wait_true
 
 LEVEL_SEED = 4242
 SEED = 918273645
 
 
-def test_staged_spawn_matches_vanilla_initial_spawn(server):
-    """Vanilla chose the world spawn for LEVEL_SEED at startup; staging the same seed must agree."""
-    startup = server.status()["startupSpawn"]
-    assert startup["dimension"] == "minecraft:overworld"
+def test_prepared_spawn_uses_the_requested_seed(server):
+    """A spawn selected during preparation belongs to the requested seed after activation."""
+    server.wait_until(lambda status: status["status"] == "RUNNING", 240,
+                      "the automatically started first run")
+    wait_preparation_idle(server)
     server.rcon(f"soullink prepare {LEVEL_SEED} 1")
     ready = server.wait_until(lambda s: s["preparation"].get("ready", {}).get("seed") == LEVEL_SEED, 240,
-                              "the vanilla-seed run")["preparation"]["ready"]
-    assert (ready["spawn"]["x"], ready["spawn"]["y"], ready["spawn"]["z"]) == (startup["x"], startup["y"], startup["z"])
+                              "the seeded run")["preparation"]["ready"]
+    assert ready["seed"] == LEVEL_SEED
+    assert all(isinstance(ready["spawn"][axis], int) for axis in ("x", "y", "z"))
+    status = start_run(server, [], command="soullink reset")
+    assert status["runSeed"] == LEVEL_SEED
+    x, _, z = status["spawn"]
+    probe = server.rcon_json(f"soullink debug probe minecraft:overworld {x} {z}")
+    assert probe["levelSeed"] == LEVEL_SEED
 
 
 def run_with_seed(server, preload: int, command: str) -> None:
+    server.wait_until(lambda status: status["status"] == "RUNNING", 240,
+                      "the automatically started first run")
+    wait_preparation_idle(server)
     server.rcon(f"soullink prepare {SEED} {preload}")
     server.wait_until(lambda s: s["preparation"].get("ready", {}).get("seed") == SEED
                       and s["preparation"]["ready"]["preloadRadius"] == preload, 240, f"run with preload {preload}")
     start_run(server, [], command=command)
 
 
-def deterministic(probe):
-    return ([(p["x"], p["z"], p["noiseHeight"], p["biome"]) for p in probe["samples"]], probe["structureStarts"])
+def probes_at_origin(server):
+    return {
+        dimension: server.rcon_json(f"soullink debug probe {dimension} 0 0")
+        for dimension in (OVERWORLD, "minecraft:the_nether", "minecraft:the_end")
+    }
 
 
-def decoration(probe):
-    return [(p["x"], p["z"], p["surfaceHeight"]) for p in probe["samples"]] + [probe["spawnChunkHash"]]
+def deterministic(probes):
+    return {
+        dimension: ([(p["x"], p["z"], p["noiseHeight"], p["biome"]) for p in probe["samples"]],
+                    probe["structureStarts"])
+        for dimension, probe in probes.items()
+    }
+
+
+def decoration(probes):
+    return [
+        (dimension, p["x"], p["z"], p["surfaceHeight"])
+        for dimension, probe in probes.items()
+        for p in probe["samples"]
+    ] + [(dimension, probe["spawnChunkHash"]) for dimension, probe in probes.items()]
 
 
 def test_staged_generation_equals_canonical_generation(server):
@@ -44,25 +69,25 @@ def test_staged_generation_equals_canonical_generation(server):
     Decoration (trees, lakes) is placed across chunk borders in vanilla and depends on generation order;
     a canonical-only control run with a different order shows how much of that is vanilla's own variance.
     """
-    run_with_seed(server, 4, "start")
-    staged = server.rcon_json("soullink debug probe")
+    run_with_seed(server, 4, "soullink reset")
+    staged = probes_at_origin(server)
 
-    run_with_seed(server, 0, "reset")
-    canonical = server.rcon_json("soullink debug probe")
+    run_with_seed(server, 0, "soullink reset")
+    canonical = probes_at_origin(server)
 
     # Control: vanilla only, same seed, generated in a different order (parallel forced batch first).
-    run_with_seed(server, 0, "reset")
-    x, _, z = server.status()["spawn"]
-    server.rcon(f"forceload add {x - 72} {z - 72} {x + 72} {z + 72}")
+    run_with_seed(server, 0, "soullink reset")
+    server.rcon("forceload add -72 -72 72 72")
     wait_true(lambda: "chunks" in server.rcon("forceload query").lower(), 30, "forceload")
     time.sleep(3)
-    control = server.rcon_json("soullink debug probe")
+    control = probes_at_origin(server)
     server.rcon("forceload remove all")
 
-    for probe in (staged, canonical, control):
-        assert probe["globalSeed"] == probe["overworldSeed"] == probe["netherSeed"] == probe["endSeed"] == SEED
+    for probes in (staged, canonical, control):
+        for probe in probes.values():
+            assert probe["globalSeed"] == probe["overworldSeed"] == probe["netherSeed"] == probe["endSeed"] == SEED
     assert deterministic(staged) == deterministic(canonical) == deterministic(control)
-    assert staged["structureStarts"], "expected structure starts near spawn for this seed"
+    assert staged[OVERWORLD]["structureStarts"], "expected structure starts near the origin for this seed"
 
     staged_vs_canonical = [a for a, b in zip(decoration(staged), decoration(canonical)) if a != b]
     staged_vs_control = [a for a, b in zip(decoration(staged), decoration(control)) if a != b]
@@ -93,7 +118,7 @@ def test_changed_data_packs_invalidate_the_prepared_run(server):
     assert fresh["fingerprint"] != ready["fingerprint"]
     stale = server.stage_dimensions / ready["runId"]
     assert not stale.exists(), "stale staged data is deleted"
-    start_run(server, [], command="reset")
+    start_run(server, [], command="soullink reset")
 
 
 def test_dimensions_that_are_not_reset_keep_the_world_seed(server):

@@ -48,7 +48,9 @@ def test_policy_classifies_every_dimension(server, arena):
 
 def test_opted_in_dimension_is_replaced_with_the_run_seed(server, players, arena):
     before = levels(server.status())
-    status = start_run(server, players, timeout=400)
+    # The first run starts automatically at server startup; reset once to exercise a replacement against
+    # the already-live canonical levels captured above.
+    status = start_run(server, players, command="soullink reset", timeout=400)
     after = levels(status)
     replaced = after[DEEPER_DARK]
     assert replaced["identity"] != before[DEEPER_DARK]["identity"], "a new level object under the same key"
@@ -65,7 +67,7 @@ def test_opted_in_dimension_is_replaced_with_the_run_seed(server, players, arena
 
 def test_external_dimension_data_survives_resets(server, players, arena):
     arena_identity = levels(server.status())[arena]["identity"]
-    start_run(server, players, command="reset", timeout=400)
+    start_run(server, players, command="soullink reset", timeout=400)
     assert levels(server.status())[arena]["identity"] == arena_identity
     assert "passed" in server.rcon(f"execute in {arena} if block 0 200 0 minecraft:gold_block")
 

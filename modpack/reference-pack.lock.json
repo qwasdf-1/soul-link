@@ -2,7 +2,7 @@
   "name": "Soul Link reference server pack",
   "minecraft": "26.2",
   "loader": "fabric",
-  "note": "Pinned candidate modpack for compatibility tests T14, T15, T18. Mods are downloaded from Modrinth at test time and verified by SHA-512; nothing is redistributed.",
+  "note": "Pinned candidate modpack for compatibility tests T14, T15, T18 and the WTHIT world-transition regression. Mods are downloaded from Modrinth at test time and verified by SHA-512; nothing is redistributed.",
   "mods": [
     {
       "slug": "lithostitched",
@@ -212,6 +212,30 @@
       "url": "https://cdn.modrinth.com/data/fALzjamp/versions/4Eotm6ov/Chunky-Fabric-1.5.3.jar",
       "sha512": "b83bfe7b218d0aa6232af977ae741dc1f82b10e50cd12bb759f65cf416b8b62beccb543e587ef0b9670abe03815660f8e091bc6823624d65cf07300571573516",
       "size": 354095
+    },
+    {
+      "slug": "badpackets",
+      "role": "library",
+      "purpose": "WTHIT's required server/client packet library",
+      "version": "fabric-0.12.2",
+      "versionId": "SgNrUT3E",
+      "projectId": "ftdbN0KK",
+      "file": "badpackets-fabric-0.12.2.jar",
+      "url": "https://cdn.modrinth.com/data/ftdbN0KK/versions/SgNrUT3E/badpackets-fabric-0.12.2.jar",
+      "sha512": "91ba4b89e2730d1c31ed6eea35605706908441b6097d4e6b7388cfff9d4a0bc8ae99db98926142a376adff6f0c7910b67c014cf90b9859a7754a2a2dc78c5384",
+      "size": 54465
+    },
+    {
+      "slug": "wthit",
+      "role": "tooling",
+      "purpose": "Server-side block and fluid tooltip data requests for the 26.2 transition regression",
+      "version": "20.0.0",
+      "versionId": "7hordoNl",
+      "projectId": "6AQIaxuO",
+      "file": "wthit-26.2-fabric-20.0.0.jar",
+      "url": "https://cdn.modrinth.com/data/6AQIaxuO/versions/7hordoNl/wthit-26.2-fabric-20.0.0.jar",
+      "sha512": "92c5043c81666ce6c1c2fe580423e2bd5f26d2b67bf432ec7def831c6f582e17279e32ab0ea0eab79656c095d19e2471e22406f7e613c2ef628d112efdcc68c9",
+      "size": 918047
     }
   ]
 }

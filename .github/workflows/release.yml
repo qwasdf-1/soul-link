@@ -9,8 +9,21 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  targets:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.targets.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: targets
+        run: echo "matrix=$(jq -c . gradle/minecraft-targets.json)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: targets
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.targets.outputs.matrix) }}
     defaults:
       run:
         working-directory: soul-link
@@ -22,44 +35,87 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: qwasdf-1/terra-rasa
-          ref: v0.1.0
+          ref: main
           path: terra-rasa
 
-      - name: Install Java 25
+      - name: Install Java ${{ matrix.java_version }}
         uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: "25"
+          java-version: ${{ matrix.java_version }}
 
       - uses: gradle/actions/setup-gradle@v6
 
-      - name: Check release tag
-        id: version
+      - name: Build and publish Terra Rasa for Minecraft ${{ matrix.minecraft_version }}
+        working-directory: terra-rasa
+        run: >-
+          ./gradlew publishToMavenLocal
+          -Ploom_version=${{ matrix.loom_version }}
+          -Pminecraft_version=${{ matrix.minecraft_version }}
+          -Pfabric_loader_version=${{ matrix.fabric_loader_version }}
+          -Pfabric_api_version=${{ matrix.fabric_api_version }}
+          -Pjava_version=${{ matrix.java_version }}
+
+      - name: Build and test Minecraft ${{ matrix.minecraft_version }}
+        run: >-
+          ./gradlew clean build
+          -PterraRasaPath=../terra-rasa
+          -Ploom_version=${{ matrix.loom_version }}
+          -Pminecraft_version=${{ matrix.minecraft_version }}
+          -Pfabric_loader_version=${{ matrix.fabric_loader_version }}
+          -Pfabric_api_version=${{ matrix.fabric_api_version }}
+          -Pjava_version=${{ matrix.java_version }}
+
+      - name: Stage runtime jar
+        env:
+          MINECRAFT: ${{ matrix.minecraft_version }}
         run: |
+          set -euo pipefail
           version="$(sed -n 's/^mod_version=//p' gradle.properties)"
-          minecraft="$(sed -n 's/^minecraft_version=//p' gradle.properties)"
+          jar="build/libs/soullink-mc${MINECRAFT}-${version}.jar"
+          test -f "$jar"
+          mkdir -p dist
+          cp "$jar" dist/
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: soullink-${{ matrix.minecraft_version }}
+          path: soul-link/dist/*.jar
+          if-no-files-found: error
+          retention-days: 1
+
+  publish-github-release:
+    needs: [targets, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: soullink-*
+          path: dist
+          merge-multiple: true
+
+      - name: Verify all target jars and prepare release notes
+        id: version
+        env:
+          TARGETS_JSON: ${{ needs.targets.outputs.matrix }}
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^mod_version=//p' gradle.properties)"
           test "$GITHUB_REF_NAME" = "v$version" || {
             echo "Tag $GITHUB_REF_NAME does not match mod_version $version" >&2
             exit 1
           }
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "minecraft=$minecraft" >> "$GITHUB_OUTPUT"
-
-      - name: Build and test
-        run: ./gradlew clean build
-
-      - name: Prepare release assets and notes
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-          MINECRAFT: ${{ steps.version.outputs.minecraft }}
-        run: |
-          set -euo pipefail
-          asset="build/libs/soullink-mc${MINECRAFT}-${VERSION}.jar"
-          test -f "$asset"
-          mkdir -p dist
-          cp "$asset" dist/
-          (cd dist && sha256sum "$(basename "$asset")" > SHA256SUMS)
-          awk -v heading="## $VERSION" '$0 == heading { show=1; next } show && /^## / { exit } show { print }' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
+          while IFS= read -r minecraft; do
+            test -f "dist/soullink-mc${minecraft}-${version}.jar" || {
+              echo "Missing runtime jar for Minecraft $minecraft" >&2
+              exit 1
+            }
+          done < <(jq -r '.include[].minecraft_version' <<< "$TARGETS_JSON")
+          (cd dist && sha256sum *.jar > SHA256SUMS)
+          awk -v heading="## $version" '$0 == heading { show=1; next } show && /^## / { exit } show { print }' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
           test -s "$RUNNER_TEMP/release-notes.md"
 
       - name: Publish GitHub release

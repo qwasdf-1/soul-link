@@ -13,10 +13,12 @@ import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import dev.soullink.mixin.EnderDragonFightAccessor;
+import dev.soullink.MinecraftCompat;
 import dev.soullink.run.RunCoordinator;
 import dev.terrarasa.FaultInjection;
 import dev.terrarasa.Json;
 import dev.terrarasa.LifecycleException;
+import dev.terrarasa.WorldPreparationService;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
@@ -36,40 +38,81 @@ import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.enderdragon.phases.EnderDragonPhase;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.dimension.end.EnderDragonFight;
 
-/** Player commands match Soul Link Speedrun's; {@code /soullink} holds operator and diagnostic commands. */
+/** Player and operator commands are grouped under the {@code /soullink} root. */
 public final class SoulLinkCommands {
     private SoulLinkCommands() {
     }
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher, boolean debugCommands) {
-        dispatcher.register(Commands.literal("start").executes(ctx -> reply(ctx, RunCoordinator::requestStart)));
-        dispatcher.register(Commands.literal("reset").executes(ctx -> reply(ctx, RunCoordinator::requestReset)));
-        dispatcher.register(Commands.literal("runinfo")
-                .executes(ctx -> reply(ctx, coordinator -> Component.literal(coordinator.runInfo()))));
-        dispatcher.register(Commands.literal("stoprun")
+        var prepare = Commands.literal("prepare")
                 .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
-                .executes(ctx -> reply(ctx, RunCoordinator::stopRun)));
-
-        var soullink = Commands.literal("soullink")
-                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
-                .then(Commands.literal("status").executes(ctx -> json(ctx, () -> coordinator().describe())))
-                .then(Commands.literal("rules")
-                        .then(Commands.literal("sharedPotions")
-                                .then(Commands.argument("enabled", BoolArgumentType.bool())
-                                        .executes(ctx -> reply(ctx, coordinator -> coordinator.setSharedPotions(
-                                                BoolArgumentType.getBool(ctx, "enabled")))))))
-                .then(Commands.literal("prepare")
+                .executes(ctx -> reply(ctx, coordinator -> coordinator.prepare(null, null)))
+                .then(Commands.literal("random")
                         .executes(ctx -> reply(ctx, coordinator -> coordinator.prepare(null, null)))
-                        .then(Commands.argument("seed", LongArgumentType.longArg())
-                                .executes(ctx -> reply(ctx, coordinator -> coordinator.prepare(LongArgumentType.getLong(ctx, "seed"), null)))
-                                .then(Commands.argument("preloadRadius", IntegerArgumentType.integer(0, 32))
-                                        .executes(ctx -> reply(ctx, coordinator -> coordinator.prepare(
-                                                LongArgumentType.getLong(ctx, "seed"),
-                                                IntegerArgumentType.getInteger(ctx, "preloadRadius")))))));
+                        .then(Commands.argument("preloadRadius", IntegerArgumentType.integer(0, 32))
+                                .executes(ctx -> reply(ctx, coordinator -> coordinator.prepare(null,
+                                        IntegerArgumentType.getInteger(ctx, "preloadRadius"))))))
+                .then(Commands.argument("seed", LongArgumentType.longArg())
+                        .executes(ctx -> reply(ctx, coordinator -> coordinator.prepare(LongArgumentType.getLong(ctx, "seed"), null)))
+                        .then(Commands.argument("preloadRadius", IntegerArgumentType.integer(0, 32))
+                                .executes(ctx -> reply(ctx, coordinator -> coordinator.prepare(
+                                        LongArgumentType.getLong(ctx, "seed"),
+                                        IntegerArgumentType.getInteger(ctx, "preloadRadius"))))));
+        var rules = Commands.literal("rules")
+                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .then(Commands.literal("sharedPotions")
+                        .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                .executes(ctx -> reply(ctx, coordinator -> coordinator.setSharedPotions(
+                                        BoolArgumentType.getBool(ctx, "enabled"))))))
+                .then(Commands.literal("naturalRegeneration")
+                        .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                .executes(ctx -> reply(ctx, coordinator -> coordinator.setNaturalRegeneration(
+                                        BoolArgumentType.getBool(ctx, "enabled"))))))
+                .then(Commands.literal("halfHeart")
+                        .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                .executes(ctx -> reply(ctx, coordinator -> coordinator.setHalfHeart(
+                                        BoolArgumentType.getBool(ctx, "enabled"))))));
+        var setup = Commands.literal("setup")
+                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .executes(ctx -> reply(ctx, RunCoordinator::setupInfo))
+                .then(Commands.literal("pregen")
+                        .then(Commands.argument("dimension", StringArgumentType.word())
+                                .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
+                                        coordinator().policy().resettable().stream().map(Object::toString), builder))
+                                .then(Commands.argument("radiusBlocks", IntegerArgumentType.integer(0, 4096))
+                                        .executes(ctx -> reply(ctx, coordinator -> coordinator.setPregenerationRadius(
+                                                StringArgumentType.getString(ctx, "dimension"),
+                                                IntegerArgumentType.getInteger(ctx, "radiusBlocks")))))));
+        setup.then(Commands.literal("pool")
+                .then(Commands.argument("futureRuns", IntegerArgumentType.integer(1, WorldPreparationService.MAX_READY_RUNS))
+                        .executes(ctx -> reply(ctx, coordinator -> coordinator.setPreparedRunPoolSize(
+                                IntegerArgumentType.getInteger(ctx, "futureRuns"))))));
+        var soullink = Commands.literal("soullink")
+                .executes(SoulLinkCommands::help)
+                .then(Commands.literal("help").executes(SoulLinkCommands::help))
+                .then(Commands.literal("start").executes(ctx -> reply(ctx, RunCoordinator::requestStart)))
+                .then(Commands.literal("reset").executes(ctx -> reply(ctx, RunCoordinator::requestReset)))
+                .then(Commands.literal("info")
+                        .executes(ctx -> reply(ctx, coordinator -> Component.literal(coordinator.runInfo()))))
+                .then(Commands.literal("status")
+                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .executes(ctx -> reply(ctx, RunCoordinator::statusInfo)))
+                .then(Commands.literal("stop")
+                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .executes(ctx -> reply(ctx, RunCoordinator::stopRun)))
+                .then(Commands.literal("pause")
+                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .executes(ctx -> reply(ctx, RunCoordinator::pauseTimer)))
+                .then(Commands.literal("resume")
+                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .executes(ctx -> reply(ctx, RunCoordinator::resumeTimer)))
+                .then(setup)
+                .then(prepare)
+                .then(rules);
         if (debugCommands) {
             soullink.then(Commands.literal("debug")
+                    .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                     .then(Commands.literal("lifecycle").executes(ctx -> json(ctx, () -> coordinator().describe())))
                     .then(Commands.literal("fail")
                             .then(Commands.argument("point", StringArgumentType.word())
@@ -114,6 +157,31 @@ public final class SoulLinkCommands {
         return coordinator;
     }
 
+    private static int help(CommandContext<CommandSourceStack> ctx) {
+        String text = "Soul Link — linked health and rotating fresh-world runs\n"
+                + "Player commands: /soullink start, /soullink reset, /soullink info\n"
+                + "  start: enter the prepared run, or wait for preparation to finish\n"
+                + "  reset: abandon the current run and start the next fresh run\n"
+                + "  info: show run status, shared health, timer, and next-world progress\n"
+                + "Operator commands (permission level 2):\n"
+                + "  /soullink status: show lifecycle, prepared-run pool, and preparation details\n"
+                + "  /soullink stop: end the run and return everyone to the lobby\n"
+                + "  /soullink pause and /soullink resume: pause or resume the run timer; gameplay continues\n"
+                + "  /soullink setup: view settings; /soullink setup pool <futureRuns> sets 1–3 prepared runs\n"
+                + "  /soullink setup pregen <dimension> <radiusBlocks>: set a radius in blocks (0 disables)\n"
+                + "  /soullink prepare [seed|random] [preloadRadius]: replace queued worlds and prepare a run\n"
+                + "    radius is 0–32 chunks; omitted radius uses the configured default. Use 'random 0' to disable preload.\n"
+                + "    wait for any current preparation to finish before replacing the pool\n"
+                + "  /soullink rules sharedPotions <true|false>: share potion effects starting next run\n"
+                + "  /soullink rules naturalRegeneration <true|false>: change vanilla's gamerule now\n"
+                + "  /soullink rules halfHeart <true|false>: set participants to half a heart starting next run\n"
+                + "Examples: /soullink prepare 12345 6; /soullink setup pregen minecraft:overworld 750; "
+                + "/soullink rules halfHeart true\n"
+                + "Use /soullink debug lifecycle for machine-readable diagnostics when debugCommands is enabled.";
+        ctx.getSource().sendSuccess(() -> Component.literal(text), false);
+        return 1;
+    }
+
     private static int reply(CommandContext<CommandSourceStack> ctx, Function<RunCoordinator, Component> action) {
         Component message = action.apply(coordinator());
         ctx.getSource().sendSuccess(() -> message, false);
@@ -148,7 +216,7 @@ public final class SoulLinkCommands {
     private static JsonObject describeEnd(MinecraftServer server) {
         JsonObject json = new JsonObject();
         ServerLevel end = server.getLevel(Level.END);
-        EnderDragonFight fight = end != null ? end.getDragonFight() : null;
+        Object fight = end != null ? end.getDragonFight() : null;
         if (fight == null) {
             return json;
         }
@@ -166,7 +234,7 @@ public final class SoulLinkCommands {
         }
         json.addProperty("dragonKilled", accessor.soullink$dragonKilled());
         json.addProperty("previouslyKilled", accessor.soullink$previouslyKilled());
-        json.addProperty("aliveCrystals", fight.aliveCrystals());
+        json.addProperty("aliveCrystals", MinecraftCompat.aliveDragonCrystals(fight));
         ServerBossEvent bar = accessor.soullink$bossBar();
         JsonObject bossBar = new JsonObject();
         bossBar.addProperty("visible", bar.isVisible());
@@ -237,7 +305,7 @@ public final class SoulLinkCommands {
         json.addProperty("absorption", player.getAbsorptionAmount());
         json.addProperty("seenCredits", player.seenCredits);
         JsonArray tags = new JsonArray();
-        player.entityTags().forEach(tags::add);
+        MinecraftCompat.entityTags(player).forEach(tags::add);
         json.add("tags", tags);
         int done = 0;
         for (var holder : server.getAdvancements().getAllAdvancements()) {

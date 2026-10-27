@@ -4,8 +4,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.StringJoiner;
 
 import net.minecraft.network.protocol.game.ClientboundHurtAnimationPacket;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -85,6 +87,23 @@ public final class SharedVitality {
         this.food = pool.food();
         this.saturation = pool.saturation();
         boolean someoneHurt = !damageTaken.isEmpty();
+        if (someoneHurt) {
+            StringJoiner names = new StringJoiner(", ");
+            float damage = 0.0F;
+            for (ServerPlayer player : participants) {
+                Float taken = damageTaken.get(player.getUUID());
+                if (taken != null) {
+                    names.add(player.getGameProfile().name());
+                    damage += taken;
+                }
+            }
+            String message = String.format(java.util.Locale.ROOT,
+                    "%s lost %.1f health. Shared health: %.1f/%.1f.", names, damage, this.health, maxHealth);
+            Component component = Component.literal(message);
+            for (ServerPlayer player : participants) {
+                player.sendSystemMessage(component, false);
+            }
+        }
         if (this.health <= 0.0F) {
             return true;
         }

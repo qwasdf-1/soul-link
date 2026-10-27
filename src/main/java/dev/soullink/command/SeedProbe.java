@@ -7,6 +7,7 @@ import java.util.zip.CRC32;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import dev.soullink.MinecraftCompat;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.server.MinecraftServer;
@@ -37,14 +38,14 @@ final class SeedProbe {
     static JsonObject probe(MinecraftServer server, ServerLevel level, BlockPos center, boolean far) {
         JsonObject json = new JsonObject();
         json.addProperty("dimension", level.dimension().identifier().toString());
-        json.addProperty("globalSeed", server.getWorldGenSettings().options().seed());
+        json.addProperty("globalSeed", MinecraftCompat.globalSeed(server));
         json.addProperty("levelSeed", level.getSeed());
         json.addProperty("overworldSeed", server.overworld().getSeed());
         json.addProperty("netherSeed", server.getLevel(Level.NETHER).getSeed());
         json.addProperty("endSeed", server.getLevel(Level.END).getSeed());
         json.add("samples", samples(level, center, far));
         json.add("structureStarts", structureStarts(level, center));
-        json.addProperty("spawnChunkHash", chunkHash(level, ChunkPos.containing(center)));
+        json.addProperty("spawnChunkHash", chunkHash(level, MinecraftCompat.chunkPos(center)));
         return json;
     }
 
@@ -77,9 +78,9 @@ final class SeedProbe {
     private static JsonArray structureStarts(ServerLevel level, BlockPos center) {
         var structures = level.registryAccess().lookupOrThrow(Registries.STRUCTURE);
         TreeSet<String> starts = new TreeSet<>();
-        ChunkPos origin = ChunkPos.containing(center);
-        for (int cx = origin.x() - STRUCTURE_SCAN_RADIUS; cx <= origin.x() + STRUCTURE_SCAN_RADIUS; cx++) {
-            for (int cz = origin.z() - STRUCTURE_SCAN_RADIUS; cz <= origin.z() + STRUCTURE_SCAN_RADIUS; cz++) {
+        ChunkPos origin = MinecraftCompat.chunkPos(center);
+        for (int cx = MinecraftCompat.chunkX(origin) - STRUCTURE_SCAN_RADIUS; cx <= MinecraftCompat.chunkX(origin) + STRUCTURE_SCAN_RADIUS; cx++) {
+            for (int cz = MinecraftCompat.chunkZ(origin) - STRUCTURE_SCAN_RADIUS; cz <= MinecraftCompat.chunkZ(origin) + STRUCTURE_SCAN_RADIUS; cz++) {
                 // Structure starts exist from this status on; full generation of 81 chunks can take
                 // longer than the watchdog allows in heavy modded dimensions.
                 level.getChunk(cx, cz, ChunkStatus.STRUCTURE_STARTS).getAllStarts().forEach((structure, start) -> {
@@ -96,7 +97,7 @@ final class SeedProbe {
     }
 
     private static String chunkHash(ServerLevel level, ChunkPos position) {
-        LevelChunk chunk = level.getChunk(position.x(), position.z());
+        LevelChunk chunk = level.getChunk(MinecraftCompat.chunkX(position), MinecraftCompat.chunkZ(position));
         CRC32 crc = new CRC32();
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
         for (int y = level.getMinY(); y < level.getMaxY(); y++) {

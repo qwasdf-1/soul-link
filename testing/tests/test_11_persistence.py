@@ -12,7 +12,7 @@ import time
 
 import pytest
 
-from helpers import LOBBY, NETHER, OVERWORLD, levels, start_run, wait_true
+from helpers import LOBBY, NETHER, OVERWORLD, levels, start_run, wait_preparation_idle, wait_true
 
 SOULLINK_CONFIG = {"preloadRadius": 2, "sharedPotions": True}
 
@@ -80,7 +80,7 @@ def test_graceful_restart_resumes_the_run_where_it_stopped(server):
 
 
 def test_crash_resumes_the_run_from_its_last_save(server):
-    start_run(server, connect(server), command="reset")
+    start_run(server, connect(server), command="soullink reset")
     status = server.status()
     wait_true(lambda: server.status()["elapsedTicks"] > 20 * 12, 60, "the timer to run")
     killed_at = server.status()["elapsedTicks"]
@@ -99,6 +99,9 @@ def test_crash_resumes_the_run_from_its_last_save(server):
 
 def test_restart_during_preparation_starts_it_over(server):
     connect(server)
+    server.wait_until(lambda status: status["status"] == "RUNNING", 240,
+                      "the automatically started first run")
+    wait_preparation_idle(server)
     server.rcon("soullink prepare")
     wait_true(lambda: server.status()["preparation"].get("active"), 30, "a preparation in progress")
     abandoned = server.status()["preparation"]["active"]["runId"]

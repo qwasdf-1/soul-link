@@ -1,6 +1,6 @@
 # Publishing to Modrinth
 
-The GitHub release workflow builds the mod jar and creates a GitHub Release. The Modrinth workflow takes that same release jar, checks it against the attached SHA-256 file, and publishes it as a Modrinth version. The GitHub release notes become the Modrinth version changelog.
+The release workflow builds one jar per supported Minecraft version and attaches all six jars plus a SHA-256 checksum file to one GitHub Release. The Modrinth workflow verifies each jar and creates one Modrinth version per game target. Each Modrinth version uses a unique number such as `0.2.0-mc1.21.11` or `0.2.0-mc26.2`; GitHub release notes become each version's changelog.
 
 The workflow does not edit the Modrinth project page description, gallery, categories, or other project settings. Keep that project information up to date on Modrinth.
 
@@ -9,21 +9,23 @@ The workflow does not edit the Modrinth project page description, gallery, categ
 1. Create and configure both Modrinth projects. Set their source links to:
    - Soul Link: https://github.com/qwasdf-1/soul-link
    - Terra Rasa: https://github.com/qwasdf-1/terra-rasa
-2. Create a Modrinth token with `PROJECT_READ` and `VERSION_CREATE` permissions. `PROJECT_READ` lets the publisher resolve draft projects; `VERSION_CREATE` lets it upload versions.
+2. Create a Modrinth token with `PROJECT_READ` and `VERSION_CREATE` permissions. `PROJECT_READ` lets the publisher verify the project source links; `VERSION_CREATE` lets it upload versions.
 3. In the Soul Link GitHub repository, add the Actions secret MODRINTH_TOKEN with that token.
-4. Add these repository Actions variables:
-   - MODRINTH_PROJECT_URL with the full Soul Link Modrinth URL.
-   - MODRINTH_TERRA_RASA_PROJECT_URL with the full Terra Rasa Modrinth URL.
-5. Run the Publish to Modrinth workflow from Actions and enter an existing release tag, such as v0.1.0.
+4. Add these repository Actions variables with the project IDs:
+   - `MODRINTH_PROJECT_ID` for Soul Link.
+   - `MODRINTH_TERRA_RASA_PROJECT_ID` for Terra Rasa.
+5. Run the Publish to Modrinth workflow from Actions and enter an existing release tag.
 
-The workflow resolves each URL through Modrinth, checks that each project links back to its expected GitHub repository, and prints both project IDs in the run summary. Then set MODRINTH_PROJECT_ID and MODRINTH_TERRA_RASA_PROJECT_ID to those IDs. Future publishes use the IDs directly, even if the URL variables remain set. IDs remain stable if project slugs change.
+The workflow checks that each project links back to its expected GitHub repository. IDs remain stable if project slugs change.
 
 ## Future releases
 
-Push a version tag such as v0.2.0. The release workflow builds and attaches the jar and SHA-256 checksum, then dispatches the Modrinth publishing workflow with that tag. The publisher uploads the runtime jar with the matching Minecraft version, Fabric loader, dedicated-server environment, and Fabric API dependency. It also marks Terra Rasa as an embedded dependency because Soul Link bundles the library in its jar.
+The `v0.1.0` release already exists, so bump `mod_version` before publishing this multi-version update; do not reuse that tag.
 
-If a GitHub Release already exists and needs to be published on Modrinth, run Publish to Modrinth manually with its tag. Each version number can only be published once on Modrinth.
+Push a version tag that matches `mod_version`, such as `v0.2.0`. The release workflow builds all target jars, attaches them with a SHA-256 checksum file, then dispatches the Modrinth publisher. The publisher creates one version per Minecraft target, with the matching game version, Fabric loader, dedicated-server environment, and Fabric API dependency. It also marks Terra Rasa as an embedded dependency because Soul Link bundles the library in each jar.
+
+If a GitHub Release already exists and needs to be published on Modrinth, run Publish to Modrinth manually with its tag. A retry skips a target version that already matches its release jar and metadata; it stops if the existing version differs.
 
 ## Checks and failures
 
-The workflow stops if the tag does not match the mod version at that tag, if the expected runtime jar or checksum is missing, if the checksum fails, or if either Modrinth project's source URL points elsewhere. The token is used to resolve both projects (including while they are drafts) and create the Soul Link version. The publisher does not change project visibility: submit each draft for Modrinth review in its project settings before expecting it to appear publicly.
+The workflow stops if the tag does not match the mod version at that tag, if the expected runtime jar or checksum is missing, if the checksum fails, or if either Modrinth project's source URL points elsewhere. The Modrinth token is used to read the project metadata and create versions.
