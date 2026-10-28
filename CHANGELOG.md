@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.4.1
+
+### Fixed
+
+- Clear WTHIT's cached fluid block lookup before replacing run worlds, avoiding stale references to retired levels when tooltip requests overlap a swap.
+
+### Changed
+
+- Publish versions from 0.3.0 onward as client-and-server compatible, including integrated-server and LAN hosts.
+
 ## 0.4.0
 
 ### Added

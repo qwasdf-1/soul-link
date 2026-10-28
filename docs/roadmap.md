@@ -1,6 +1,6 @@
 # Product and gameplay backlog
 
-This document tracks requested Soul Link improvements and their implementation status. The 26.2 WTHIT/C2ME transition issue remains open pending further diagnosis.
+This document tracks requested Soul Link improvements and their implementation status. The WTHIT cache-lifetime workaround passed repeated rendered 26.2 world transitions with the pinned WTHIT/C2ME stack; the upstream root cause remains unconfirmed. See the [operations reference](reference.md).
 
 ## Operator onboarding and first run
 
