@@ -1,6 +1,6 @@
 # Publishing to Modrinth
 
-The release workflow builds one jar per supported Minecraft version and attaches all six jars plus a SHA-256 checksum file to one GitHub Release. The Modrinth workflow verifies each jar and creates one Modrinth version per game target. Each Modrinth version uses a unique number such as `0.3.0-mc1.21.11` or `0.3.0-mc26.2`; GitHub release notes become each version's changelog.
+The release workflow builds one jar per supported Minecraft version and attaches all six jars plus a SHA-256 checksum file to one GitHub Release. The Modrinth workflow verifies each jar and creates one Modrinth version per game target. Each Modrinth version uses a unique number such as `0.4.0-mc1.21.11` or `0.4.0-mc26.2`; GitHub release notes become each version's changelog.
 
 The workflow does not edit the Modrinth project page description, gallery, categories, or other project settings. Keep that project information up to date on Modrinth.
 
@@ -20,9 +20,9 @@ The workflow checks that each project links back to its expected GitHub reposito
 
 ## Versioning and compatibility
 
-The existing `v0.1.0` and `v0.2.0` versions remain dedicated-server-only. Starting with `v0.3.0`, new Soul Link versions are published as client-and-server compatible. Soul Link bundles Terra Rasa; keep `terra_rasa_version` in `gradle.properties` matched to the Terra Rasa release and merge the library update before the Soul Link update.
+The existing `v0.1.0` and `v0.2.0` versions remain `dedicated_server_only`; `v0.3.0` remains `client_and_server`. Starting with `v0.4.0`, new versions use Modrinth's `server_only` environment: Soul Link runs its gameplay on the server and also supports integrated single-player servers. Soul Link bundles Terra Rasa; keep `terra_rasa_version` in `gradle.properties` matched to the Terra Rasa release and merge and release the library update before the Soul Link update.
 
-Push a version tag that matches `mod_version`. The release workflow builds all target jars, attaches them with a SHA-256 checksum file, then dispatches the Modrinth publisher. The publisher creates one version per Minecraft target, with the matching game version, Fabric loader, client-and-server environment, and Fabric API dependency. It also marks Terra Rasa as an embedded dependency because Soul Link bundles the library in each jar.
+Push a version tag that matches `mod_version`. The release workflow builds all target jars, attaches them with a SHA-256 checksum file, then dispatches the Modrinth publisher. The publisher creates one version per Minecraft target, with the matching game version, Fabric loader, `server_only` environment, and Fabric API dependency. It also marks Terra Rasa as an embedded dependency because Soul Link bundles the library in each jar. The workflow does not change project-level Modrinth settings; update the project environment separately when needed.
 
 If a GitHub Release already exists and needs to be published on Modrinth, run Publish to Modrinth manually with its tag. A retry skips a target version that already matches its release jar and metadata; it stops if the existing version differs.
 
