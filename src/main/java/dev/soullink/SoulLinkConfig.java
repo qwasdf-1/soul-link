@@ -40,6 +40,8 @@ public final class SoulLinkConfig {
     public int drainTimeoutSeconds = 60;
     /** Number of closed future runs to keep prepared; the currently active run is not counted. */
     public int preparedRunPoolSize = 1;
+    /** Ticks between staged dimension constructions while a run world is active; lobby preparation uses one tick. */
+    public int activeRunConstructionIntervalTicks = 20;
     /** Keep the configured number of prepared runs ready in the background whenever possible. */
     public boolean autoPrepare = true;
     /** Late joiners are synced into a running run; otherwise they wait in the lobby. */
@@ -122,6 +124,9 @@ public final class SoulLinkConfig {
         if (this.preparedRunPoolSize < 1 || this.preparedRunPoolSize > dev.terrarasa.WorldPreparationService.MAX_READY_RUNS) {
             throw new IllegalArgumentException("preparedRunPoolSize must be between 1 and "
                     + dev.terrarasa.WorldPreparationService.MAX_READY_RUNS);
+        }
+        if (this.activeRunConstructionIntervalTicks < 1 || this.activeRunConstructionIntervalTicks > 1200) {
+            throw new IllegalArgumentException("activeRunConstructionIntervalTicks must be between 1 and 1200");
         }
     }
 

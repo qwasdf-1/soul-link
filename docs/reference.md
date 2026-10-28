@@ -50,7 +50,7 @@ Staged levels hold chunk tickets that load chunks without ticking them, so the n
 Preparation does a bounded slice of work per tick:
 
 - 8 spawn-search checks per tick. Vanilla's climate spawn search runs on a background thread.
-- One level constructed or closed per tick.
+- One staged level constructed per tick while players are waiting in the lobby or for a run to start; during and after a run, the configurable `activeRunConstructionIntervalTicks` setting (default 20) spaces separate constructors. Closing and finalization remain tick-driven.
 - Saving uses vanilla's asynchronous chunk, entity and POI IO, and the run manifest is written off the server thread.
 - Chunk generation is paced: at most 6 chunks generate at once, and none start while the server's smoothed tick time is over 30 ms. One chunk always keeps generating, so a busy server still finishes.
 
@@ -86,7 +86,9 @@ Give the server at least 4 GB of heap with pregeneration on. The figures above a
 
 ### Swapping worlds
 
-`/soullink start` and `/soullink reset` run one server-thread section while every player is in the lobby. On vanilla worlds it takes 0.8–1.8 s: about 50 ms retires, promotes and reconstructs the levels, and the rest loads the new spawn chunk to validate it. With the reference modpack it takes 3–3.4 s, mostly C2ME compiling density functions for each new level (about 2.3 s for the Overworld). The levels for the following run are constructed in the same pause, so they cost no separate hitch later.
+`/soullink start` and `/soullink reset` run one server-thread section while every player is in the lobby. On vanilla worlds it takes 0.8–1.8 s: about 50 ms retires, promotes and reconstructs the levels, and the rest loads the new spawn chunk to validate it. With the reference modpack it takes 3–3.4 s, mostly C2ME compiling density functions for each new level (about 2.3 s for the Overworld). This remains the activation cost. Construction of dimensions for the *following* run no longer gets forced into that pause: Soul Link leaves it on Terra Rasa's regular tick path, one staged dimension per tick while waiting to start and one every `activeRunConstructionIntervalTicks` ticks while the run world remains playable (default 20). This spreads separate constructors out but cannot split an individual synchronous constructor, so a slow constructor can still cause an isolated long tick. The interval is configurable from 1 to 1200 ticks in `config/soullink.json`; pool size and `autoPrepare` control how much work is queued.
+
+Focused 26.2 dedicated-server integration checks passed with vanilla and with the pinned C2ME reference modpack. They compare Terra Rasa's recorded constructor ticks and verify a minimum 20-tick gap between staged dimensions while a run is active. This verifies cadence, not a lower worst-case constructor cost or elimination of lag warnings. The single-constructor server-thread cost remains.
 
 ### Longevity
 

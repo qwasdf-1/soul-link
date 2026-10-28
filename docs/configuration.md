@@ -17,6 +17,7 @@ Soul Link reads `config/soullink.json` at server startup and creates it with def
     "minecraft:the_end": 160
   },
   "preparedRunPoolSize": 1,
+  "activeRunConstructionIntervalTicks": 20,
   "preparationTimeoutSeconds": 900,
   "drainTimeoutSeconds": 60,
   "autoPrepare": true,
@@ -38,6 +39,7 @@ Soul Link reads `config/soullink.json` at server startup and creates it with def
 | `preloadRadius` | `6` | `0`–`32` chunks around the prepared spawn, loaded before a run can start. `/soullink prepare <seed> <radius>` can override it for one preparation. |
 | `pregeneration` | Overworld `500`, Nether `96`, End `160` | Map of resettable dimension identifiers to radii in blocks. `0` or omission disables an area; maximum radius is `4096`. Pregeneration is optional background work and is never a prerequisite for starting. |
 | `preparedRunPoolSize` | `1` | Number of closed future runs to keep ready, from `1` to `3`. The active run does not count. Change it with `/soullink setup pool <futureRuns>`. |
+| `activeRunConstructionIntervalTicks` | `20` | Minimum ticks between creating staged dimensions while a run world is active or ended. Set `1` to construct at most one dimension per tick; valid range is `1`–`1200`. Lobby and startup preparation always use one tick between dimensions. Editing this setting requires a server restart. |
 | `preparationTimeoutSeconds` | `900` | At least `10` seconds. Bounds preparation through the usable spawn; if the only remaining work is optional pregeneration, it stops there without failing the ready run. |
 | `drainTimeoutSeconds` | `60` | At least `5` seconds to finish pending saves and close retired levels during a swap. |
 | `autoPrepare` | `true` | Fill the configured future-run pool while the server is in the lobby or a run is active. The initial first run starts automatically; later prepared runs wait for `/soullink start`. |

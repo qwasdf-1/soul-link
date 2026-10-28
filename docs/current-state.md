@@ -27,6 +27,12 @@ toolchain versions live in `gradle/minecraft-targets.json`.
   natural-regeneration game rule.
 - FIFO queue of up to three durable prepared future runs, configured with
   `/soullink setup pool <futureRuns>`; the active run is not counted.
+- Future-run dimensions construct on Terra Rasa's tick path: one per tick while
+  players wait in the lobby, and one per configurable interval while a run
+  world remains playable. This spaces separate synchronous constructors; it
+  does not split one constructor across ticks. Focused 26.2 dedicated-server
+  checks passed with vanilla and with the pinned C2ME reference modpack; the
+  exact server-tick gaps are asserted by the integration tests.
 - Player-facing notices announce the world swap before activation and the new
   run after players arrive.
 - Optional half-heart mode with restoration of participant max-health base

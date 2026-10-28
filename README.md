@@ -10,7 +10,7 @@ Each run uses fresh, seeded Overworld, Nether, and End worlds while players stay
 - **Optional unlinked vitality:** operators can use `/soullink rules sharedVitality false` to let players keep their own health, food, and saturation in the next run. This leaves world preparation and swaps active.
 - **Run outcomes:** with shared vitality enabled, any participant death or an empty shared health pool ends the run in defeat. With it off, normal worlds allow vanilla respawns; vanilla hardcore ends after every participant is eliminated. Operators can enable Soul Link Hardcore to end on the first death regardless of shared vitality. Killing the Ender Dragon wins. After victory, players remain in the world and can use vanilla's exit portal and credits.
 - **Fresh worlds without reconnecting:** a persistent lobby holds players during the swap. Runs use new seeds and vanilla dimension identities; world generation and modded biomes work through the normal registries.
-- **Background preparation:** the next run's spawn area and optional pregeneration work are prepared while the current run is played. `/soullink start` and `/soullink reset` do not wait for the full pregeneration radius.
+- **Background preparation:** the next run's spawn area and optional pregeneration work are prepared while the current run is played. Staged dimensions are constructed one per tick while players wait in the lobby or to start, and at a configurable interval while a run world remains playable. `/soullink start` and `/soullink reset` do not wait for the full pregeneration radius.
 - **Run timer and records:** the timer counts only while a participant is online. Run count, victories, and best victory time persist with the world.
 - **Late join and restart recovery:** by default, a new player joining a live run is reset to its baseline and enters that run. Existing participants resume their run after a disconnect or server restart.
 - **Optional shared potions:** when enabled, ongoing effect gains, upgrades, removals, and expirations are mirrored to teammates. Instant healing and damage already flow through shared vitality.
@@ -83,6 +83,7 @@ Players can read the [gameplay guide](docs/gameplay.md) for the lobby, run state
 | `preloadRadius` | `6` chunks | Spawn area loaded before a run can start. |
 | `pregeneration` | Overworld `500`, Nether `96`, End `160` blocks | Background area generated around the run spawn or End island. Use `{}` to disable it. |
 | `preparedRunPoolSize` | `1` | Number of prepared future runs, from `1` to `3`, excluding the active run. Change it with `/soullink setup pool <futureRuns>`. |
+| `activeRunConstructionIntervalTicks` | `20` | Minimum ticks between staged dimension constructions during and after a run (`1`–`1200`). Lobby and startup preparation always use one tick between dimensions. |
 | `preparationTimeoutSeconds` | `900` | Limit for preparation up to a usable spawn. |
 | `drainTimeoutSeconds` | `60` | Time allowed to drain and close old levels during activation. |
 | `autoPrepare` | `true` | Fill the configured prepared-run pool. The first run starts automatically once its spawn is ready; later runs wait for `/soullink start`. |

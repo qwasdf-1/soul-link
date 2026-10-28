@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.4.2
+
+### Changed
+
+- Pace future-run dimension construction during and after gameplay instead of batching it into the world-swap pause; the interval is configurable, defaulting to one dimension every 20 ticks.
+
 ## 0.4.1
 
 ### Fixed
