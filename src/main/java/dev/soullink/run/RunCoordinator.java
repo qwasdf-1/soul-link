@@ -218,6 +218,11 @@ public final class RunCoordinator {
     private void tickWork() {
         this.ticks++;
         int readyBefore = this.preparation.readyCount();
+        boolean runWorldInUse = this.state.status == SoulLinkState.Status.RUNNING
+                || this.state.status == SoulLinkState.Status.ENDED;
+        this.preparation.setLevelConstructionIntervalTicks(runWorldInUse
+                ? this.config.activeRunConstructionIntervalTicks
+                : 1);
         this.preparation.tick(this.server);
         reportNewPreparationFailure();
         if (this.preparation.readyCount() > readyBefore
@@ -498,12 +503,12 @@ public final class RunCoordinator {
         this.state.spawnY = result.spawn().getY();
         this.state.spawnZ = result.spawn().getZ();
         save();
-        // Start the next run's preparation while everyone still waits in the lobby: building its levels is
-        // the one step that cannot be spread over ticks, so it belongs in this pause, not in the run.
+        // Keep the next run filling in the background. Terra Rasa paces each synchronous dimension
+        // construction while this run world is active; lobby/startup preparation uses the faster pace.
         if (this.config.autoPrepare && !this.preparation.isPreparing()
-                && this.preparation.readyCount() < this.preparation.readyLimit()
-                && beginPreparation(null)) {
-            this.preparation.constructNow(this.server);
+                && this.preparation.readyCount() < this.preparation.readyLimit()) {
+            // The next server tick advances preparation at the current run's configured cadence.
+            beginPreparation(null);
         }
         enterRun();
         return Component.literal("Run started in " + result.timingsMillis().getOrDefault("total", 0L) + " ms.");
@@ -884,6 +889,9 @@ public final class RunCoordinator {
                 .append("\nSet the pool size with /soullink setup pool <futureRuns>.")
                 .append("\nSet a radius with /soullink setup pregen <dimension> <radiusBlocks>; 0 disables it.")
                 .append("\nChanges apply to preparations begun after the setting is changed.")
+                .append("\nActive-run construction interval: ")
+                .append(this.config.activeRunConstructionIntervalTicks)
+                .append(" ticks per staged dimension; set activeRunConstructionIntervalTicks in config/soullink.json and restart.")
                 .append("\nautoPrepare controls whether Soul Link fills the pool in the background.");
         return Component.literal(info.toString());
     }
