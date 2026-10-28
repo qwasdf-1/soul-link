@@ -159,7 +159,7 @@ jobs:
           set -euo pipefail
           version_number="${VERSION}-mc${MINECRAFT}"
           version_name="Soul Link $VERSION (Minecraft $MINECRAFT)"
-          environment="client_and_server"
+          environment="server_only"
           case "$VERSION" in
             0.1.0|0.2.0) environment="dedicated_server_only" ;;
           esac
