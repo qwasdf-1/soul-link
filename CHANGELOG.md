@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.4.0
+
+### Added
+
+- Add an operator-configurable shared-vitality rule. With it off, normal worlds use vanilla respawns and vanilla hardcore ends after a team wipe; the separate Soul Link Hardcore rule ends any run on the first participant death.
+
+### Changed
+
+- Refresh the displayed run timer every 0.1 seconds.
+- Bundle Terra Rasa 0.3.1, including the Minecraft 1.21.11 legacy Overworld activation fix.
+
+### Fixed
+
+- Report asynchronous state-save failures in the server log and show the correct continuation message after an unlinked normal-mode death.
+
 ## 0.3.0
 
 ### Added

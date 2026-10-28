@@ -35,10 +35,11 @@ toolchain versions live in `gradle/minecraft-targets.json`.
   26.x line.
 - One versioned GitHub release with a separate jar and Modrinth version for
   each supported game target.
-- Integrated single-player and LAN-host support is prepared for the coordinated
-  0.3.0 release across all six targets. A rendered 26.2 single-player smoke
-  test passed through first-run activation; vanilla LAN guest login remains
-  unverified.
+- Integrated single-player and LAN-host support shipped in 0.3.0 across all six
+  targets. Version 0.4.0 adds configurable shared-vitality and first-death
+  hardcore rules, with vanilla respawn/team-wipe behavior when vitality is off.
+  A rendered 26.2 single-player smoke test passed through first-run activation;
+  vanilla LAN guest login remains unverified.
 
 ## Known compatibility issue
 
