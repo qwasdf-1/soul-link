@@ -41,15 +41,34 @@ toolchain versions live in `gradle/minecraft-targets.json`.
   A rendered 26.2 single-player smoke test passed through first-run activation;
   vanilla LAN guest login remains unverified.
 
-## Known compatibility issue
+## WTHIT/C2ME compatibility status
 
 A rendered-client comparison points to an interaction between WTHIT block-data
-requests and C2ME during `/soullink reset`: the WTHIT client completed with C2ME removed,
-and C2ME completed without WTHIT client requests (while its server integration
-remained installed). WTHIT's singleton fluid provider may dereference a cache
-bound to the retired run level. This is a leading hypothesis, not a confirmed
-root cause. See the [operations reference](reference.md).
-Headless integration clients do not exercise WTHIT's block-tooltip packet.
+requests and C2ME during `/soullink reset`: the WTHIT client completed with C2ME
+removed, and C2ME completed without WTHIT client requests (while its server
+integration remained installed). WTHIT's singleton fluid provider may
+dereference a cache bound to the retired run level. Soul Link now clears that
+optional cache before world replacement. Repeated rendered 26.2 testing with
+WTHIT 20.0.0, Bad Packets 0.12.2, C2ME 0.4.2-alpha.0.60, and the pinned server
+modpack completed five world transitions (four `/soullink reset` calls and one
+`/soullink start`) in 4.1–6.5 seconds each. WTHIT showed a barrel tooltip
+before several resets and after the final two. The client stayed connected and
+the logs contained no WTHIT reflection warning, C2ME old-chunk cancellation,
+`Max retries reached`, failed chunk load, or chunk upgrade error. Treat this
+workaround as validated for that pinned stack; the upstream root cause remains
+unconfirmed. Headless integration clients do not exercise WTHIT's block-tooltip
+packet. See the [operations reference](reference.md).
+
+One generated test seed put the player in an ocean spawn and a Drowned ended
+that run. The later swaps used Creative mode to isolate the transition check;
+this was not correlated with the WTHIT/C2ME chunk-loading failure. The server
+also reported Spark world-statistics timeouts and `Can't keep up` warnings while
+generating the next run, so the local timings are compatibility evidence, not
+a performance benchmark.
+
+Earlier reference-pack runs logged C2ME `Block-attached entity at invalid
+position` errors during world generation, before the transition. The cause is
+unknown and tracked separately from the WTHIT transition issue.
 
 A separate operator log reported a Terra Rasa preparation timeout in `FLUSHING`.
 The matching start and failure timestamps are exactly 900 seconds apart,

@@ -159,10 +159,9 @@ jobs:
           set -euo pipefail
           version_number="${VERSION}-mc${MINECRAFT}"
           version_name="Soul Link $VERSION (Minecraft $MINECRAFT)"
-          environment="server_only"
+          environment="client_and_server"
           case "$VERSION" in
             0.1.0|0.2.0) environment="dedicated_server_only" ;;
-            0.3.0) environment="client_and_server" ;;
           esac
           existing_response="$RUNNER_TEMP/existing-version.json"
           if ! existing_status="$(curl --silent --show-error --output "$existing_response" --write-out '%{http_code}' \
