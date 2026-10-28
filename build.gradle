@@ -23,10 +23,11 @@ dependencies {
 // Real dedicated-server integration testing (shared with Terra Rasa's build).
 apply from: rootProject.file('gradle/integration-server.gradle')
 def integrationServerDirectory = integrationRoot.map { it.dir('server') }
+def runtimeJarTask = obfuscatedMinecraft ? 'remapJar' : 'jar'
 
 def prepareIntegrationServer = registerServerInstall('prepareIntegrationServer',
         'Assembles a production-style Fabric dedicated server with the built Soul Link jar.', integrationServerDirectory,
-        tasks.named('jar'))
+        tasks.named(runtimeJarTask))
 
 registerSuite('integrationTest', 'Runs the real dedicated-server integration suite (Python harness in testing/).',
         integrationServerDirectory, prepareIntegrationServer, [])
@@ -75,7 +76,7 @@ def downloadReferencePack = tasks.register('downloadReferencePack') {
 
 def prepareModpackServer = registerServerInstall('prepareModpackServer',
         'Assembles the integration server with the reference modpack installed.', modpackServerDirectory,
-        files(tasks.named('jar'), files(referencePackDirectory).builtBy(downloadReferencePack)))
+        files(tasks.named(runtimeJarTask), files(referencePackDirectory).builtBy(downloadReferencePack)))
 
 registerSuite('modpackTest', 'Runs the reference modpack compatibility suite on a real server.',
         modpackServerDirectory, prepareModpackServer, ['-m', 'modpack', 'tests/modpack'])

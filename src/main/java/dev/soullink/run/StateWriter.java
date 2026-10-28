@@ -34,7 +34,7 @@ final class StateWriter {
 
     /** Writes the state and waits for it to reach disk: for transitions a crash must not lose. */
     void save(SoulLinkState state) {
-        Future<?> write = submit(state);
+        Future<?> write = submit(state, false);
         try {
             write.get();
         } catch (InterruptedException e) {
@@ -46,7 +46,7 @@ final class StateWriter {
 
     /** Writes the state in the background if it changed since the last write. */
     void saveInBackground(SoulLinkState state) {
-        submit(state);
+        submit(state, true);
     }
 
     /** Flushes pending writes; the writer accepts nothing afterwards. */
@@ -61,13 +61,20 @@ final class StateWriter {
         }
     }
 
-    private Future<?> submit(SoulLinkState state) {
+    private Future<?> submit(SoulLinkState state, boolean logFailure) {
         SoulLinkState snapshot = state.snapshot();
         return this.writer.submit(() -> {
-            String json = Json.GSON.toJson(snapshot);
-            if (!json.equals(this.lastWritten)) {
-                AtomicFiles.writeString(this.file, json);
-                this.lastWritten = json;
+            try {
+                String json = Json.GSON.toJson(snapshot);
+                if (!json.equals(this.lastWritten)) {
+                    AtomicFiles.writeString(this.file, json);
+                    this.lastWritten = json;
+                }
+            } catch (IOException | RuntimeException | Error failure) {
+                if (logFailure) {
+                    SoulLink.LOGGER.error("Could not save Soul Link state to {}", this.file, failure);
+                }
+                throw failure;
             }
             return null;
         });

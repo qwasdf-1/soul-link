@@ -44,6 +44,10 @@ public final class SoulLinkConfig {
     public boolean autoPrepare = true;
     /** Late joiners are synced into a running run; otherwise they wait in the lobby. */
     public boolean allowLateJoin = true;
+    /** Shared health, food, and saturation; captured when a run starts. */
+    public boolean sharedVitality = true;
+    /** When enabled for a run, any participant death ends it even with shared vitality disabled. */
+    public boolean soulLinkHardcore;
     /** Shared potions: effects on one participant apply to every participant. Applies from the next run. */
     public boolean sharedPotions = false;
     /** Reduces participants to one health point (half a heart), applying from the next run. */

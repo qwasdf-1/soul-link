@@ -61,6 +61,14 @@ public final class SoulLinkCommands {
                                         IntegerArgumentType.getInteger(ctx, "preloadRadius"))))));
         var rules = Commands.literal("rules")
                 .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .then(Commands.literal("sharedVitality")
+                        .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                .executes(ctx -> reply(ctx, coordinator -> coordinator.setSharedVitality(
+                                        BoolArgumentType.getBool(ctx, "enabled"))))))
+                .then(Commands.literal("soulLinkHardcore")
+                        .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                .executes(ctx -> reply(ctx, coordinator -> coordinator.setSoulLinkHardcore(
+                                        BoolArgumentType.getBool(ctx, "enabled"))))))
                 .then(Commands.literal("sharedPotions")
                         .then(Commands.argument("enabled", BoolArgumentType.bool())
                                 .executes(ctx -> reply(ctx, coordinator -> coordinator.setSharedPotions(
@@ -172,6 +180,8 @@ public final class SoulLinkCommands {
                 + "  /soullink prepare [seed|random] [preloadRadius]: replace queued worlds and prepare a run\n"
                 + "    radius is 0–32 chunks; omitted radius uses the configured default. Use 'random 0' to disable preload.\n"
                 + "    wait for any current preparation to finish before replacing the pool\n"
+                + "  /soullink rules sharedVitality <true|false>: link health, food, and saturation starting next run\n"
+                + "  /soullink rules soulLinkHardcore <true|false>: end on any participant death starting next run\n"
                 + "  /soullink rules sharedPotions <true|false>: share potion effects starting next run\n"
                 + "  /soullink rules naturalRegeneration <true|false>: change vanilla's gamerule now\n"
                 + "  /soullink rules halfHeart <true|false>: set participants to half a heart starting next run\n"

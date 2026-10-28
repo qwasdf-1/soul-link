@@ -17,6 +17,8 @@ This document tracks requested Soul Link improvements and their implementation s
 - `/soullink help` and the consolidated `/soullink` command tree cover start, reset, info, status, stop, prepare, and rules. The former top-level `/start`, `/reset`, `/stoprun`, and `/runinfo` aliases are removed.
 - `/soullink setup` displays and updates per-dimension pregeneration radii and a FIFO pool of one to three prepared future runs. The default is one; `/soullink setup pool <futureRuns>` changes the pool size. Teammates receive a health-loss message naming affected players and showing the change and resulting shared health.
 - `/soullink rules naturalRegeneration <true|false>` toggles vanilla's world-persisted game rule immediately without creating a second Soul Link setting.
+- `/soullink rules sharedVitality <true|false>` saves whether health, food, and saturation link for future runs; current runs retain their setting snapshot.
+- When shared vitality is off, normal runs use vanilla respawns and vanilla hardcore ends on team wipe. `/soullink rules soulLinkHardcore <true|false>` independently enables first-death defeat for future runs.
 - `/soullink rules halfHeart <true|false>` saves the next-run option. Half-heart mode sets each participant's maximum and the shared pool to 1 HP; prior max-health base values are restored when returning to the lobby.
 - `/soullink pause` and `/soullink resume` are operator-only and pause only the timer. World simulation and shared vitality continue normally, including across server restarts.
 - `/soullink status` is readable; machine-readable lifecycle output remains under `/soullink debug lifecycle`.

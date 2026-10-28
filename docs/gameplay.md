@@ -15,7 +15,7 @@ Players see a world-swap notice before activation and a run-ready notice after t
 
 ## Shared vitality
 
-Every active participant has the same health, food, and saturation values.
+By default, every active participant has the same health, food, and saturation values. Operators can turn this off for the next run with `/soullink rules sharedVitality false`; each player then keeps their own health, food, and saturation. Shared potions and half-heart mode are independent settings.
 
 - Damage from different participants adds to the shared health loss.
 - Healing is shared, but simultaneous healing only uses the largest individual health gain for that tick.
@@ -27,9 +27,11 @@ Every active participant has the same health, food, and saturation values.
 
 This is not shared inventory or shared equipment. Those modes are not implemented.
 
+When shared vitality is off, deaths follow the world mode by default: players respawn normally outside vanilla hardcore, while a vanilla hardcore run ends only after all participants have been eliminated. Operators can enable `/soullink rules soulLinkHardcore true` to make the first participant death end any run. This rule is saved for future runs.
+
 ## Defeat and victory
 
-Any participant death in a run dimension ends the run in defeat. Remaining participants become spectators; the dead participant is also put into spectator mode on respawn. The run also ends in defeat if shared health is depleted. The defeated world continues ticking so spectators can move and inspect it; victory worlds also remain live for vanilla portal and credits behavior.
+With shared vitality enabled, any participant death in a run dimension ends the run in defeat; the shared health pool reaching zero also ends it. With shared vitality disabled, normal worlds allow vanilla respawns and vanilla hardcore ends after a team wipe, unless Soul Link Hardcore is enabled to end on the first death. Defeat turns remaining participants into spectators; they can move and inspect the world. Victory worlds also remain live for vanilla portal and credits behavior.
 
 Defeating the Ender Dragon in the canonical End ends the run in victory. Players stay in the world, so vanilla's exit portal, credits, and return to the run spawn work normally. The timer stops at the result. Soul Link records total runs, victories, and the best victory time.
 
@@ -57,6 +59,8 @@ Defeating the Ender Dragon in the canonical End ends the run in victory. Players
 | `/soullink setup pregen <dimension> <radiusBlocks>` | Operators | Change a dimension's pregeneration radius for future preparations; `0` disables it. |
 | `/soullink prepare [seed|random] [preloadRadius]` | Operators | Discard queued ready runs and prepare a new one. Omitted seed means random; omitted radius uses the configured default. Use `random 0` to disable spawn preload. Wait for any current preparation to finish first. |
 | `/soullink rules sharedPotions <true\|false>` | Operators | Persist the shared-potions setting for the next run. |
+| `/soullink rules sharedVitality <true\|false>` | Operators | Persist whether health, food, and saturation are shared for the next run. |
+| `/soullink rules soulLinkHardcore <true\|false>` | Operators | Persist whether the first participant death ends the next run. |
 | `/soullink rules naturalRegeneration <true\|false>` | Operators | Change vanilla's world-persisted `naturalRegeneration` game rule immediately. |
 | `/soullink rules halfHeart <true\|false>` | Operators | Set each participant's maximum health and the shared pool to 1 HP from the next run. |
 
