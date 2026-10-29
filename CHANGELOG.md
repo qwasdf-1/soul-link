@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.4.3
+
 ### Added
 
 - Add an operator-only vanilla chest-style `/soullink setup` menu for run rules, prepared-run pool size, and paged pregeneration controls. Restart-required settings are shown read-only, and text commands remain available from the console.
