@@ -2,6 +2,9 @@ package dev.soullink;
 
 import java.util.Set;
 
+import dev.soullink.run.RunCoordinator;
+import dev.soullink.setup.SetupMenu;
+import dev.soullink.setup.SetupMenuView;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.permissions.Permissions;
@@ -47,6 +50,14 @@ public final class MinecraftCompat {
 
     public static void setNaturalRegeneration(MinecraftServer server, boolean enabled) {
         server.getGameRules().set(GameRules.NATURAL_HEALTH_REGENERATION, enabled, server);
+    }
+
+    public static void openSetupMenu(ServerPlayer player, RunCoordinator coordinator, SetupMenuView.Page page, int pageOffset) {
+        SetupMenu.open(player, coordinator, page, pageOffset);
+    }
+
+    public static void closeSetupMenu(ServerPlayer player) {
+        player.closeContainer();
     }
 
     public static int aliveDragonCrystals(Object fight) {

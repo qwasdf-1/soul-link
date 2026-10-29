@@ -16,7 +16,9 @@ This document tracks requested Soul Link improvements and their implementation s
 - The initial run auto-starts after preparation.
 - `/soullink help` and the consolidated `/soullink` command tree cover start, reset, info, status, stop, prepare, and rules. The former top-level `/start`, `/reset`, `/stoprun`, and `/runinfo` aliases are removed.
 - `/soullink setup` displays and updates per-dimension pregeneration radii and a FIFO pool of one to three prepared future runs. The default is one; `/soullink setup pool <futureRuns>` changes the pool size. Teammates receive a health-loss message naming affected players and showing the change and resulting shared health.
+- `/soullink setup` opens an operator-only vanilla chest menu in game for live settings, pool size, and paged pregeneration controls. Restart-required options are read-only and labeled. Console users retain the command interface and `/soullink setup info` text summary.
 - `/soullink rules naturalRegeneration <true|false>` toggles vanilla's world-persisted game rule immediately without creating a second Soul Link setting.
+- `/soullink rules autoPrepare <true|false>` and `/soullink rules allowLateJoin <true|false>` change their settings immediately; both are also available in the setup menu.
 - `/soullink rules sharedVitality <true|false>` saves whether health, food, and saturation link for future runs; current runs retain their setting snapshot.
 - When shared vitality is off, normal runs use vanilla respawns and vanilla hardcore ends on team wipe. `/soullink rules soulLinkHardcore <true|false>` independently enables first-death defeat for future runs.
 - `/soullink rules halfHeart <true|false>` saves the next-run option. Half-heart mode sets each participant's maximum and the shared pool to 1 HP; prior max-health base values are restored when returning to the lobby.
@@ -25,14 +27,6 @@ This document tracks requested Soul Link improvements and their implementation s
 - Preparation progress names its current phase. Soul Link reports on phase changes and repeats an unchanged phase every 30 seconds rather than every ten ticks. Operators receive a recovery hint and issue-report link when preparation fails.
 - A fresh run shows a clear ready message when it starts.
 - Terra Rasa no longer lets the overall preparation deadline interrupt flushing once the usable spawn is ready. Each staged-level close and manifest publication still have bounded drain timeouts; the overall timeout stops optional pregeneration and remains fatal in earlier required phases.
-
-### Requested behavior
-
-- Offer an operator setup flow for optional pregeneration, including which dimensions to pregenerate and how much work to schedule. The current command shows and changes per-dimension radii; the first-join message links operators to `/soullink help` and `/soullink setup`.
-
-### Remaining setup work
-
-- An interactive prompt for pregeneration choices is not part of the current command flow. Operators can set per-dimension radii and pool size directly; revisit an interactive wizard separately if needed.
 
 ## Command experience
 

@@ -1,8 +1,8 @@
 package dev.soullink.mixin;
 
-import java.util.List;
 import java.util.UUID;
 
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.world.level.dimension.end.EndDragonFight;
@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 public interface EnderDragonFightAccessor {
     /** Gateway indices not yet spawned; the next gateway is the last element. Shuffled from the seed. */
     @Accessor("gateways")
-    List<Integer> soullink$gateways();
+    ObjectArrayList<Integer> soullink$gateways();
 
     @Accessor("portalLocation")
     @Nullable BlockPos soullink$exitPortalLocation();

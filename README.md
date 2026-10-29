@@ -60,13 +60,17 @@ By default, Soul Link replaces the vanilla Overworld, Nether, and End. The lobby
 | `/soullink status` | Operators | Show readable lifecycle, preparation, and failure details. |
 | `/soullink stop` | Operators | End the run and return everyone to the lobby. |
 | `/soullink pause` / `/soullink resume` | Operators | Pause or resume only the run timer; gameplay continues. |
-| `/soullink setup` | Operators | View pregeneration and the future-run pool. `/soullink setup pool <futureRuns>` sets a pool of 1–3; `/soullink setup pregen <dimension> <radiusBlocks>` sets that dimension's radius. |
+| `/soullink setup` | Operators | Open the vanilla settings menu in game; from console, show a text summary. `/soullink setup info` always shows text. The menu controls live rules, pool size, and per-dimension pregeneration. |
+| `/soullink setup pool <futureRuns>` | Operators | Set the prepared future-run pool to 1–3; the active run is separate. |
+| `/soullink setup pregen <dimension> <radiusBlocks>` | Operators | Set that dimension's pregeneration radius in blocks; `0` disables it. |
 | `/soullink prepare [seed|random] [preloadRadius]` | Operators | Replace queued ready runs with a new preparation. Wait for any current preparation to finish first. Omitting the seed chooses one randomly; omitting the radius uses the configured default. |
 | `/soullink rules sharedVitality <true\|false>` | Operators | Link or separate health, food, and saturation starting next run. |
 | `/soullink rules soulLinkHardcore <true\|false>` | Operators | End the next run on any participant's first death, even with shared vitality off. |
 | `/soullink rules sharedPotions <true\|false>` | Operators | Set whether shared potions are enabled for the next run and save the setting. |
 | `/soullink rules naturalRegeneration <true\|false>` | Operators | Change vanilla's `naturalRegeneration` game rule immediately. |
 | `/soullink rules halfHeart <true\|false>` | Operators | Set max health and shared health to 1 HP starting next run. |
+| `/soullink rules allowLateJoin <true\|false>` | Operators | Allow or prevent new players from joining an active run immediately. |
+| `/soullink rules autoPrepare <true\|false>` | Operators | Enable or disable background preparation of future runs immediately. |
 
 All mod commands are grouped under `/soullink`. Machine-readable status is available through `/soullink debug lifecycle` when `debugCommands` is enabled.
 

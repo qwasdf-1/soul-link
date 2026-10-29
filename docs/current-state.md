@@ -22,9 +22,11 @@ toolchain versions live in `gradle/minecraft-targets.json`.
 - `/soullink help`, a consolidated command root with the old top-level aliases removed, readable
   `/soullink status`, phase-based preparation notices, and operator failure
   messages with a recovery command.
-- Per-operator first-join onboarding, an operator pregeneration setup command,
+- Per-operator first-join onboarding, an operator-only vanilla chest setup menu
+  with pool and paged pregeneration controls, console-compatible commands,
   readable damage-sharing notices, and a command for vanilla's persisted
-  natural-regeneration game rule.
+  natural-regeneration game rule. Restart-required options are read-only in the
+  menu.
 - FIFO queue of up to three durable prepared future runs, configured with
   `/soullink setup pool <futureRuns>`; the active run is not counted.
 - Future-run dimensions construct on Terra Rasa's tick path: one per tick while
