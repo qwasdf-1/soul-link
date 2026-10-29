@@ -119,6 +119,8 @@ jobs:
         uses: astral-sh/setup-uv@v6
 
       - name: Integration suite for Minecraft ${{ matrix.minecraft_version }}
+        env:
+          MC_TEST_PROTOCOL_VERSION: ${{ matrix.protocol_version }}
         run: >-
           ./gradlew integrationTest
           -PterraRasaPath=../terra-rasa

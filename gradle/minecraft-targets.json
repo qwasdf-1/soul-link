@@ -5,42 +5,48 @@
       "loom_version": "1.17.21",
       "fabric_loader_version": "0.19.5",
       "fabric_api_version": "0.141.6+1.21.11",
-      "java_version": "21"
+      "java_version": "21",
+      "protocol_version": 774
     },
     {
       "minecraft_version": "26.1",
       "loom_version": "1.18.4",
       "fabric_loader_version": "0.19.5",
       "fabric_api_version": "0.145.1+26.1",
-      "java_version": "25"
+      "java_version": "25",
+      "protocol_version": 775
     },
     {
       "minecraft_version": "26.1.1",
       "loom_version": "1.18.4",
       "fabric_loader_version": "0.19.5",
       "fabric_api_version": "0.145.4+26.1.1",
-      "java_version": "25"
+      "java_version": "25",
+      "protocol_version": 775
     },
     {
       "minecraft_version": "26.1.2",
       "loom_version": "1.18.4",
       "fabric_loader_version": "0.19.5",
       "fabric_api_version": "0.155.3+26.1.2",
-      "java_version": "25"
+      "java_version": "25",
+      "protocol_version": 775
     },
     {
       "minecraft_version": "26.2",
       "loom_version": "1.18.4",
       "fabric_loader_version": "0.19.5",
       "fabric_api_version": "0.161.0+26.2",
-      "java_version": "25"
+      "java_version": "25",
+      "protocol_version": 776
     },
     {
       "minecraft_version": "26.3",
       "loom_version": "1.18.4",
       "fabric_loader_version": "0.19.5",
       "fabric_api_version": "0.165.0+26.3",
-      "java_version": "25"
+      "java_version": "25",
+      "protocol_version": 777
     }
   ]
 }

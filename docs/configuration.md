@@ -1,6 +1,6 @@
 # Configuration
 
-Soul Link reads `config/soullink.json` at server startup and creates it with defaults if it does not exist. Restart after editing the file. The first run on a new server starts automatically once its spawn is ready. `/soullink rules sharedVitality`, `/soullink rules soulLinkHardcore`, and `/soullink rules sharedPotions` write their settings immediately, but only change the next run. `/soullink rules naturalRegeneration` changes vanilla's persisted game rule immediately.
+Soul Link reads `config/soullink.json` at server startup and creates it with defaults if it does not exist. Restart after editing the file. In game, operators can open `/soullink setup` for a vanilla chest-style menu; it uses the server's normal menu packets and needs no Soul Link client mod. The dedicated-server console gets a text summary and can use the command forms below. The first run on a new server starts automatically once its spawn is ready. Shared vitality, Soul Link Hardcore, shared potions, and half-heart mode save immediately but only change the next run. Natural regeneration and late joins change immediately. Automatic preparation controls future background work; a preparation already in progress continues if it is turned off.
 
 ```json
 {
@@ -42,12 +42,12 @@ Soul Link reads `config/soullink.json` at server startup and creates it with def
 | `activeRunConstructionIntervalTicks` | `20` | Minimum ticks between creating staged dimensions while a run world is active or ended. Set `1` to construct at most one dimension per tick; valid range is `1`–`1200`. Lobby and startup preparation always use one tick between dimensions. Editing this setting requires a server restart. |
 | `preparationTimeoutSeconds` | `900` | At least `10` seconds. Bounds preparation through the usable spawn; if the only remaining work is optional pregeneration, it stops there without failing the ready run. |
 | `drainTimeoutSeconds` | `60` | At least `5` seconds to finish pending saves and close retired levels during a swap. |
-| `autoPrepare` | `true` | Fill the configured future-run pool while the server is in the lobby or a run is active. The initial first run starts automatically; later prepared runs wait for `/soullink start`. |
-| `allowLateJoin` | `true` | Admit new players to an active run. When false, players who are not recorded participants wait in the lobby. |
-| `sharedVitality` | `true` | Share health, food, and saturation between active participants. `/soullink rules sharedVitality <true|false>` saves the next-run value immediately. |
-| `soulLinkHardcore` | `false` | End a run on any participant's first death, even when shared vitality is disabled. `/soullink rules soulLinkHardcore <true|false>` saves the next-run value immediately. |
+| `autoPrepare` | `true` | Fill the configured future-run pool while the server is in the lobby or a run is active. The initial first run starts automatically; later prepared runs wait for `/soullink start`. Toggle with `/soullink rules autoPrepare <true|false>` or the setup menu. Disabling it does not cancel work already in progress. |
+| `allowLateJoin` | `true` | Admit new players to an active run. When false, players who are not recorded participants wait in the lobby. Toggle immediately with `/soullink rules allowLateJoin <true|false>` or the setup menu. |
+| `sharedVitality` | `true` | Share health, food, and saturation between active participants. Set the next-run value with `/soullink rules sharedVitality <true|false>` or the setup menu. |
+| `soulLinkHardcore` | `false` | End a run on any participant's first death, even when shared vitality is disabled. Set the next-run value with `/soullink rules soulLinkHardcore <true|false>` or the setup menu. |
 | `sharedPotions` | `false` | Mirror ongoing status effect gains, upgrades, removals, and expirations among active participants. Instant damage and healing follow shared vitality when that rule is on. |
-| `halfHeart` | `false` | Give each participant a 1 HP maximum and make the shared pool 1 HP, starting next run. Original max-health base values are restored when participants return to the lobby. |
+| `halfHeart` | `false` | Give each participant a 1 HP maximum and make the shared pool 1 HP, starting next run. Original max-health base values are restored when participants return to the lobby. Set with `/soullink rules halfHeart <true|false>` or the setup menu. |
 | `debugCommands` | `true` | Register `/soullink debug` for operators. Set false to omit those diagnostics; `/soullink status`, `/soullink prepare`, and `/soullink rules` remain available. |
 
 ## Custom dimensions
@@ -84,13 +84,15 @@ The setting is saved in `config/soullink.json` and applies to the next run. The 
 
 When shared vitality is disabled, normal-difficulty runs use vanilla respawns. In vanilla hardcore, each dead participant is eliminated and the run ends after the whole team is eliminated. Set `soulLinkHardcore` to `true` to make any participant death end the run, regardless of vanilla hardcore or shared vitality.
 
+The setup menu shows live values, toggles settings, adjusts the prepared-run pool, and provides paged controls for each resettable dimension's pregeneration radius. Advanced settings that require a restart are shown read-only with that requirement labeled. Use `/soullink setup info` for text output in game or console.
+
 The pool size can also be changed without restarting:
 
 ```text
 /soullink setup pool 3
 ```
 
-This keeps up to three prepared future runs on disk, in start order. Reducing the size discards the newest queued runs. The active run is separate from the pool. `/soullink setup` shows the current pool count and per-dimension pregeneration radii.
+This keeps up to three prepared future runs on disk, in start order. Reducing the size discards the newest queued runs. The active run is separate from the pool. The setup menu shows the current pool count and per-dimension pregeneration radii; `/soullink setup info` prints them as text.
 
 Toggle natural regeneration immediately through vanilla's game rule:
 

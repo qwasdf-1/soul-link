@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -21,6 +22,8 @@ import dev.soullink.compat.WthitCompatibility;
 import dev.soullink.game.SharedEffects;
 import dev.soullink.game.SharedVitality;
 import dev.soullink.lobby.LobbyService;
+import dev.soullink.setup.SetupSnapshot;
+import dev.soullink.setup.SetupMenuView;
 import dev.terrarasa.ActivationJournal;
 import dev.terrarasa.CanonicalActivationService;
 import dev.terrarasa.DimensionPolicy;
@@ -894,6 +897,65 @@ public final class RunCoordinator {
                 .append(" ticks per staged dimension; set activeRunConstructionIntervalTicks in config/soullink.json and restart.")
                 .append("\nautoPrepare controls whether Soul Link fills the pool in the background.");
         return Component.literal(info.toString());
+    }
+
+    /** Snapshot used to render the operator setup menu without exposing mutable configuration. */
+    public SetupSnapshot setupSnapshot() {
+        return new SetupSnapshot(
+                this.config.sharedVitality,
+                this.config.soulLinkHardcore,
+                this.config.sharedPotions,
+                this.config.halfHeart,
+                MinecraftCompat.naturalRegeneration(this.server),
+                this.config.allowLateJoin,
+                this.config.autoPrepare,
+                this.config.preparedRunPoolSize,
+                this.preparation.readyCount(),
+                List.copyOf(this.policy.resettable()),
+                Map.copyOf(this.config.pregeneration),
+                Map.copyOf(SoulLinkConfig.defaults().pregeneration),
+                List.copyOf(this.config.persistentDimensions),
+                this.config.preloadRadius,
+                this.config.activeRunConstructionIntervalTicks,
+                this.config.preparationTimeoutSeconds,
+                this.config.drainTimeoutSeconds,
+                this.config.debugCommands);
+    }
+
+    /** Opens the server-side vanilla container used for operator setup. */
+    public void openSetupMenu(ServerPlayer player, SetupMenuView.Page page, int pageOffset) {
+        SetupMenuView.open(player, this, page, pageOffset);
+    }
+
+    /** Persistently changes whether Soul Link fills the future-run pool in the background. */
+    public Component setAutoPrepare(boolean enabled) {
+        boolean previous = this.config.autoPrepare;
+        this.config.autoPrepare = enabled;
+        try {
+            this.config.save(SoulLink.configPath());
+        } catch (IOException e) {
+            this.config.autoPrepare = previous;
+            SoulLink.LOGGER.error("Could not save the Soul Link config", e);
+            return Component.literal("Could not save the auto-prepare setting: " + e.getMessage())
+                    .withStyle(ChatFormatting.RED);
+        }
+        return Component.literal("Automatic future-run preparation " + (enabled ? "enabled" : "disabled")
+                + ". Any preparation already in progress will continue.");
+    }
+
+    /** Persistently changes whether new players may join an active run. */
+    public Component setAllowLateJoin(boolean enabled) {
+        boolean previous = this.config.allowLateJoin;
+        this.config.allowLateJoin = enabled;
+        try {
+            this.config.save(SoulLink.configPath());
+        } catch (IOException e) {
+            this.config.allowLateJoin = previous;
+            SoulLink.LOGGER.error("Could not save the Soul Link config", e);
+            return Component.literal("Could not save the late-join setting: " + e.getMessage())
+                    .withStyle(ChatFormatting.RED);
+        }
+        return Component.literal("Late joins " + (enabled ? "allowed" : "disabled") + " immediately.");
     }
 
     public Component setPreparedRunPoolSize(int futureRuns) {

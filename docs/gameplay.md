@@ -55,7 +55,8 @@ Defeating the Ender Dragon in the canonical End ends the run in victory. Players
 | `/soullink stop` | Operators | End the attempt and return players to the lobby without immediately starting another run. |
 | `/soullink pause` | Operators | Pause the run timer; the world and gameplay continue normally. |
 | `/soullink resume` | Operators | Resume a paused run timer. |
-| `/soullink setup` | Operators | Show optional per-dimension pregeneration settings. |
+| `/soullink setup` | Operators | Open the vanilla settings menu in game; console receives a text summary. `/soullink setup info` always prints the summary. |
+| `/soullink setup pool <futureRuns>` | Operators | Set the future-run pool size to 1–3; the active run is not counted. |
 | `/soullink setup pregen <dimension> <radiusBlocks>` | Operators | Change a dimension's pregeneration radius for future preparations; `0` disables it. |
 | `/soullink prepare [seed|random] [preloadRadius]` | Operators | Discard queued ready runs and prepare a new one. Omitted seed means random; omitted radius uses the configured default. Use `random 0` to disable spawn preload. Wait for any current preparation to finish first. |
 | `/soullink rules sharedPotions <true\|false>` | Operators | Persist the shared-potions setting for the next run. |
@@ -63,6 +64,8 @@ Defeating the Ender Dragon in the canonical End ends the run in victory. Players
 | `/soullink rules soulLinkHardcore <true\|false>` | Operators | Persist whether the first participant death ends the next run. |
 | `/soullink rules naturalRegeneration <true\|false>` | Operators | Change vanilla's world-persisted `naturalRegeneration` game rule immediately. |
 | `/soullink rules halfHeart <true\|false>` | Operators | Set each participant's maximum health and the shared pool to 1 HP from the next run. |
+| `/soullink rules allowLateJoin <true\|false>` | Operators | Allow or prevent new players from joining the active run immediately. |
+| `/soullink rules autoPrepare <true\|false>` | Operators | Enable or disable background preparation of future runs immediately. |
 
 When enabled by `debugCommands`, operators also get `/soullink debug lifecycle`, `gc`, `probe`, `end`, `spawners`, `player <name>`, and `fail <point>`. These are diagnostic tools; lifecycle JSON is available through `debug lifecycle`. See [Configuration](configuration.md) before enabling failure injection.
 

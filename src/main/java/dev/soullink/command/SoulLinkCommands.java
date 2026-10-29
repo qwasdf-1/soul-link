@@ -15,6 +15,7 @@ import com.mojang.brigadier.context.CommandContext;
 import dev.soullink.mixin.EnderDragonFightAccessor;
 import dev.soullink.MinecraftCompat;
 import dev.soullink.run.RunCoordinator;
+import dev.soullink.setup.SetupMenuView;
 import dev.terrarasa.FaultInjection;
 import dev.terrarasa.Json;
 import dev.terrarasa.LifecycleException;
@@ -80,10 +81,19 @@ public final class SoulLinkCommands {
                 .then(Commands.literal("halfHeart")
                         .then(Commands.argument("enabled", BoolArgumentType.bool())
                                 .executes(ctx -> reply(ctx, coordinator -> coordinator.setHalfHeart(
+                                        BoolArgumentType.getBool(ctx, "enabled"))))))
+                .then(Commands.literal("allowLateJoin")
+                        .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                .executes(ctx -> reply(ctx, coordinator -> coordinator.setAllowLateJoin(
+                                        BoolArgumentType.getBool(ctx, "enabled"))))))
+                .then(Commands.literal("autoPrepare")
+                        .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                .executes(ctx -> reply(ctx, coordinator -> coordinator.setAutoPrepare(
                                         BoolArgumentType.getBool(ctx, "enabled"))))));
         var setup = Commands.literal("setup")
                 .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
-                .executes(ctx -> reply(ctx, RunCoordinator::setupInfo))
+                .executes(SoulLinkCommands::openSetup)
+                .then(Commands.literal("info").executes(ctx -> reply(ctx, RunCoordinator::setupInfo)))
                 .then(Commands.literal("pregen")
                         .then(Commands.argument("dimension", StringArgumentType.word())
                                 .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
@@ -165,6 +175,14 @@ public final class SoulLinkCommands {
         return coordinator;
     }
 
+    private static int openSetup(CommandContext<CommandSourceStack> ctx) {
+        if (ctx.getSource().getEntity() instanceof ServerPlayer player) {
+            coordinator().openSetupMenu(player, SetupMenuView.Page.MAIN, 0);
+            return 1;
+        }
+        return reply(ctx, RunCoordinator::setupInfo);
+    }
+
     private static int help(CommandContext<CommandSourceStack> ctx) {
         String text = "Soul Link — linked health and rotating fresh-world runs\n"
                 + "Player commands: /soullink start, /soullink reset, /soullink info\n"
@@ -175,7 +193,8 @@ public final class SoulLinkCommands {
                 + "  /soullink status: show lifecycle, prepared-run pool, and preparation details\n"
                 + "  /soullink stop: end the run and return everyone to the lobby\n"
                 + "  /soullink pause and /soullink resume: pause or resume the run timer; gameplay continues\n"
-                + "  /soullink setup: view settings; /soullink setup pool <futureRuns> sets 1–3 prepared runs\n"
+                + "  /soullink setup: open the operator settings menu (console gets a text summary); add 'info' for text\n"
+                + "  /soullink setup pool <futureRuns>: set 1–3 prepared future runs\n"
                 + "  /soullink setup pregen <dimension> <radiusBlocks>: set a radius in blocks (0 disables)\n"
                 + "  /soullink prepare [seed|random] [preloadRadius]: replace queued worlds and prepare a run\n"
                 + "    radius is 0–32 chunks; omitted radius uses the configured default. Use 'random 0' to disable preload.\n"
@@ -185,6 +204,8 @@ public final class SoulLinkCommands {
                 + "  /soullink rules sharedPotions <true|false>: share potion effects starting next run\n"
                 + "  /soullink rules naturalRegeneration <true|false>: change vanilla's gamerule now\n"
                 + "  /soullink rules halfHeart <true|false>: set participants to half a heart starting next run\n"
+                + "  /soullink rules allowLateJoin <true|false>: allow new players into an active run now\n"
+                + "  /soullink rules autoPrepare <true|false>: enable or disable background future-run preparation now\n"
                 + "Examples: /soullink prepare 12345 6; /soullink setup pregen minecraft:overworld 750; "
                 + "/soullink rules halfHeart true\n"
                 + "Use /soullink debug lifecycle for machine-readable diagnostics when debugCommands is enabled.";

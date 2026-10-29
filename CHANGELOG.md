@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Added
+
+- Add an operator-only vanilla chest-style `/soullink setup` menu for run rules, prepared-run pool size, and paged pregeneration controls. Restart-required settings are shown read-only, and text commands remain available from the console.
+- Add server integration coverage that opens the setup menu and changes a rule through a normal inventory click.
+
+### Fixed
+
+- Match the 1.21.11 dragon-fight accessor to the actual FastUtil field type so legacy servers start successfully.
+- Pass the exact Minecraft protocol version to the headless integration client for each supported target.
+
 ## 0.4.2
 
 ### Changed
