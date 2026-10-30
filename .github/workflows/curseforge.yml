@@ -109,6 +109,7 @@ jobs:
           echo "terrarasa_slug=${{ vars.CURSEFORGE_TERRA_RASA_PROJECT_SLUG || vars.CURSEFORGE_TERRA_RASA_SLUG || 'terra-rasa' }}" >> "$GITHUB_OUTPUT"
 
   publish:
+    name: publish (${{ matrix.minecraft_version }})
     needs: [release, project]
     runs-on: ubuntu-latest
     strategy:
