@@ -155,15 +155,25 @@ jobs:
             exit 1
           }
 
-          jq -n --rawfile changelog "$RUNNER_TEMP/changelog.md" \
-            --arg name "$display_name" \
-            --arg fabric "$FABRIC_API_SLUG" \
-            --arg terrarasa "$TERRARASA_SLUG" \
-            --argjson game_versions "$target_game_versions" \
-            '{displayName:$name, changelog:$changelog, changelogType:"markdown", releaseType:"release", gameVersions:$game_versions, relations:{projects:[{slug:$fabric,type:"requiredDependency"},{slug:$terrarasa,type:"embeddedLibrary"}]}}' \
-            > "$RUNNER_TEMP/curseforge-metadata.json"
+          build_metadata() {
+            local include_embedded="$1"
+            local relations
+            if [[ "$include_embedded" == "true" && -n "$TERRARASA_SLUG" && "$TERRARASA_SLUG" != "none" && "$TERRARASA_SLUG" != "skip" ]]; then
+              relations='{"projects":[{"slug":"'"$FABRIC_API_SLUG"'","type":"requiredDependency"},{"slug":"'"$TERRARASA_SLUG"'","type":"embeddedLibrary"}]}'
+            else
+              relations='{"projects":[{"slug":"'"$FABRIC_API_SLUG"'","type":"requiredDependency"}]}'
+            fi
+
+            jq -n --rawfile changelog "$RUNNER_TEMP/changelog.md" \
+              --arg name "$display_name" \
+              --argjson game_versions "$target_game_versions" \
+              --argjson relations "$relations" \
+              '{displayName:$name, changelog:$changelog, changelogType:"markdown", releaseType:"release", gameVersions:$game_versions, relations:$relations}'
+          }
 
           response_file="$RUNNER_TEMP/curseforge-response.json"
+          build_metadata "true" > "$RUNNER_TEMP/curseforge-metadata.json"
+
           if ! http_status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
             -H "X-Api-Token: $CURSEFORGE_TOKEN" \
             -F "metadata=<$RUNNER_TEMP/curseforge-metadata.json" \
@@ -172,6 +182,20 @@ jobs:
             echo "Could not connect to the CurseForge upload endpoint." >&2
             test ! -s "$response_file" || cat "$response_file" >&2
             exit 1
+          fi
+
+          if [[ ! "$http_status" =~ ^2[0-9][0-9]$ ]] && grep -iq -E "Invalid slug in project relations|does not exist, is not accessible" "$response_file" 2>/dev/null; then
+            echo "Related project '$TERRARASA_SLUG' is not accessible on CurseForge (e.g. still under review); retrying upload without embedded library relation..."
+            build_metadata "false" > "$RUNNER_TEMP/curseforge-metadata.json"
+            if ! http_status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
+              -H "X-Api-Token: $CURSEFORGE_TOKEN" \
+              -F "metadata=<$RUNNER_TEMP/curseforge-metadata.json" \
+              -F "file=@dist/$JAR_NAME" \
+              "https://minecraft.curseforge.com/api/projects/${PROJECT_ID}/upload-file")"; then
+              echo "Could not connect to the CurseForge upload endpoint on retry." >&2
+              test ! -s "$response_file" || cat "$response_file" >&2
+              exit 1
+            fi
           fi
 
           if [[ ! "$http_status" =~ ^2[0-9][0-9]$ ]]; then

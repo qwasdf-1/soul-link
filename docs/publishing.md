@@ -40,7 +40,7 @@ The workflow stops if the tag does not match the mod version at that tag, if the
 2. Generate an API token from your CurseForge account settings under **API Tokens**.
 3. In the Soul Link GitHub repository, add the Actions secret `CURSEFORGE_TOKEN` with that token.
 4. Add the numeric project ID as the Actions variable `CURSEFORGE_PROJECT_ID`.
-5. (Optional) If the Terra Rasa project slug on CurseForge differs from `terra-rasa`, set the Actions variable `CURSEFORGE_TERRA_RASA_SLUG`.
+5. (Optional) If the Terra Rasa project slug on CurseForge differs from `terra-rasa`, set the Actions variable `CURSEFORGE_TERRA_RASA_SLUG`. If Terra Rasa is not published or should not be linked, set it to `none`.
 6. (Optional) If custom game version ID mappings are required, set `CURSEFORGE_GAME_VERSIONS` as a JSON map of Minecraft versions to integer arrays (e.g. `{"1.21.11": [1234, 5678]}`).
 7. (Optional) If the mod should be tagged exclusively for client or server environments, set the Actions variable `CURSEFORGE_ENVIRONMENT` to `client` or `server` (defaults to both `client,server`).
 8. Run the Publish to CurseForge workflow from Actions and enter an existing release tag, or allow the Release workflow to dispatch it automatically on new release tags.
@@ -51,7 +51,7 @@ The CurseForge publisher resolves target game versions (Minecraft version and Fa
 
 Dependencies are configured in file metadata:
 - Fabric API (`fabric-api`) is declared as a `requiredDependency`.
-- Terra Rasa (default slug `terra-rasa`) is declared as an `embeddedLibrary` because Soul Link bundles the library in its jar.
+- Terra Rasa (default slug `terra-rasa`) is declared as an `embeddedLibrary` because Soul Link bundles the library in its jar. If the related project is not accessible on CurseForge (e.g. still under review), the upload retries safely without the embedded library relation.
 
 ### Checks and failures
 
