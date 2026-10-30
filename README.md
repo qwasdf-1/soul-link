@@ -106,7 +106,7 @@ See the [configuration guide](docs/configuration.md) for valid ranges, custom di
 - [Gameplay guide](docs/gameplay.md)
 - [Configuration guide](docs/configuration.md)
 - [Operations and compatibility reference](docs/reference.md): reset coverage, restarts, pregeneration, performance, and tested mod interactions.
-- [Publishing to Modrinth](docs/publishing.md)
+- [Publishing](docs/publishing.md)
 - [Contributing](CONTRIBUTING.md)
 - [Changelog](CHANGELOG.md)
 

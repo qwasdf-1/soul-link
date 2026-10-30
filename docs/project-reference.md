@@ -34,7 +34,7 @@ for an unlisted release from a matching major/minor version.
 | Per-target toolchain | `gradle/minecraft-targets.json` |
 | Shared world-preparation API | Terra Rasa's host integration and library reference |
 | Requested product improvements | `roadmap.md` |
-| Release and Modrinth publishing | `publishing.md` |
+| Release, Modrinth, and CurseForge publishing | `publishing.md` |
 
 Source, tests, target configuration, and actual release assets take precedence
 over summaries and proposals.
