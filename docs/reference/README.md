@@ -8,4 +8,4 @@
   and operator behavior.
 - [Operations and compatibility](../reference.md) — reset, persistence,
   performance, and mod interactions.
-- [Publishing](../publishing.md) — GitHub Releases and Modrinth versions.
+- [Publishing](../publishing.md) — GitHub Releases, Modrinth, and CurseForge publication.

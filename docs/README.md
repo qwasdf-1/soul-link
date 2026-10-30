@@ -12,7 +12,7 @@
 | [Configuration guide](configuration.md) | Every operator setting, default, supported range, and custom dimension setup. |
 | [Operations and compatibility reference](reference.md) | Session reset details, persistence, pregeneration, measured costs, modpack coverage, and current client repro. |
 | [Product and gameplay backlog](roadmap.md) | Requested onboarding, command experience, and gameplay-rule improvements awaiting implementation. |
-| [Publishing](publishing.md) | One GitHub release with a Modrinth version per supported Minecraft target. |
+| [Publishing](publishing.md) | One GitHub release with Modrinth and CurseForge publication per supported Minecraft target. |
 
 This map covers maintained product, architecture, compatibility, and release
 references.
