@@ -164,9 +164,15 @@ public final class SoulLinkNeoForge {
 
         @Override
         public void beforeWorldReplacement() {
-            // WTHIT is a Fabric mod, so its server-side data providers have no NeoForge counterpart
-            // here. Jade is NeoForge's equivalent and needs its own adapter; until one exists the
-            // fluid-cache workaround is Fabric-only (see docs/reference.md).
+            // WTHIT is a Fabric mod, so its server-side data providers have no counterpart here.
+            // Jade, NeoForge's equivalent tooltip mod, does not need a matching adapter: its data
+            // providers take the hit-result accessor as a per-request argument
+            // (FluidStorageProvider.streamData(RequestBlockPacket) rebuilds it from the player's
+            // current level), and the caches Jade keeps (ItemStorageProvider.containerCache) are
+            // keyed by the target object and re-updated with the new accessor on every use. That is
+            // the shape WTHIT deviated from when its singleton fluid provider dereferenced the
+            // previous request's level-bound cache before replacing it, so the request-path hazard
+            // the WTHIT adapter addresses has no Jade analogue. See docs/reference.md.
         }
 
         /** The player events carry a vanilla {@link Player}, which is a {@link ServerPlayer} here. */

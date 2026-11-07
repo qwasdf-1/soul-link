@@ -142,9 +142,14 @@ loader:
   `PlayerRespawnEvent` path.
 - **Datapack reload behavior.** Config and dimension-policy reload completion,
   including the `/reload` path with an active run.
-- **WTHIT workaround parity.** NeoForge's equivalent is Jade; without an adapter,
-  the C2ME/WTHIT fluid-cache workaround stays Fabric-only, and that limitation is
-  stated in `docs/reference.md`.
+- **WTHIT workaround parity — investigated, not required.** NeoForge's equivalent tooltip
+  mod is Jade, but a source-level inspection of Jade (branch `26.3-fabric`, 2026-11-07) found
+  no analogue of the hazard the WTHIT adapter addresses: its data providers take the accessor
+  per request, packets rebuild it from the player's current level, and its caches are keyed by
+  target object and re-updated with the new accessor on every use. The platform hook
+  (`ModPlatform.beforeWorldReplacement`) therefore stays a documented no-op on NeoForge, and
+  the limitation is stated in `docs/reference.md`. Not empirically validated on Jade by a
+  rendered-client replay, which is the only thing that would close it fully.
 
 ## Build, tests, and packaging specifics
 
