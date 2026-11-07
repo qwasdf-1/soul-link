@@ -121,7 +121,7 @@ jobs:
   # a live run yet.
   integration:
     name: integration (${{ matrix.minecraft_version }} ${{ matrix.loader }})
-    if: github.event_name == 'workflow_dispatch' && matrix.loader == 'fabric'
+    if: github.event_name == 'workflow_dispatch'
     needs: targets
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -133,25 +133,30 @@ jobs:
         working-directory: soul-link
     steps:
       - uses: actions/checkout@v7
+        if: matrix.loader == 'fabric'
         with:
           path: soul-link
 
       - uses: actions/checkout@v7
+        if: matrix.loader == 'fabric'
         with:
           repository: qwasdf-1/terra-rasa
           ref: main
           path: terra-rasa
 
       - name: Install Java ${{ matrix.java_version }}
+        if: matrix.loader == 'fabric'
         uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: ${{ matrix.java_version }}
 
       - name: Set up Gradle
+        if: matrix.loader == 'fabric'
         uses: gradle/actions/setup-gradle@v6
 
       - name: Build and publish Terra Rasa for Minecraft ${{ matrix.minecraft_version }}
+        if: matrix.loader == 'fabric'
         working-directory: terra-rasa
         run: >-
           ./gradlew publishToMavenLocal
@@ -163,9 +168,11 @@ jobs:
           -Pjava_version=${{ matrix.java_version }}
 
       - name: Install uv
+        if: matrix.loader == 'fabric'
         uses: astral-sh/setup-uv@v6
 
       - name: Integration suite for Minecraft ${{ matrix.minecraft_version }}
+        if: matrix.loader == 'fabric'
         env:
           MC_TEST_PROTOCOL_VERSION: ${{ matrix.protocol_version }}
         run: >-
