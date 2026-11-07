@@ -2,32 +2,53 @@ plugins {
     // Minecraft 1.21.11 remains obfuscated; Minecraft 26.1+ uses the unobfuscated game jars.
     id 'net.fabricmc.fabric-loom' version "${loom_version}" apply false
     id 'net.fabricmc.fabric-loom-remap' version "${loom_version}" apply false
+    id 'net.neoforged.moddev' version "${moddev_version}" apply false
 }
 
+// -Ploader=neoforge swaps the mod platform; without it the build stays a Fabric build.
+def neoforgeLoader = (project.findProperty('loader') ?: 'fabric') == 'neoforge'
 def obfuscatedMinecraft = project.minecraft_version.startsWith('1.')
-apply plugin: obfuscatedMinecraft ? 'net.fabricmc.fabric-loom-remap' : 'net.fabricmc.fabric-loom'
 
-if (obfuscatedMinecraft) {
-    dependencies {
-        mappings loom.officialMojangMappings()
+if (neoforgeLoader) {
+    apply plugin: 'net.neoforged.moddev'
+} else {
+    apply plugin: obfuscatedMinecraft ? 'net.fabricmc.fabric-loom-remap' : 'net.fabricmc.fabric-loom'
+
+    if (obfuscatedMinecraft) {
+        dependencies {
+            mappings loom.officialMojangMappings()
+        }
     }
 }
 
 ext.modArchiveName = project.mod_id
 apply from: rootProject.file('gradle/mod-conventions.gradle')
 
-dependencies {
-    // Terra Rasa is declared per target in gradle/mod-conventions.gradle and bundled into the mod jar.
-}
-
 // Real dedicated-server integration testing (shared with Terra Rasa's build).
 apply from: rootProject.file('gradle/integration-server.gradle')
 def integrationServerDirectory = integrationRoot.map { it.dir('server') }
-def runtimeJarTask = obfuscatedMinecraft ? 'remapJar' : 'jar'
+// Loom remaps only the obfuscated 1.21.11 target; ModDevGradle's jar is already named.
+def runtimeJarTask = neoforgeLoader || !obfuscatedMinecraft ? 'jar' : 'remapJar'
+
+// Terra Rasa is a separate mod on NeoForge: ModDevGradle has no jar-in-jar equivalent of Loom's
+// `include`, and one jar cannot declare two mods, so the library's runtime jar is installed next to
+// Soul Link's on the test server. The artifact view takes it out of the runtime classpath, keeping
+// the build dependencies that produce it, and the file name marks it (Loom's version of Terra Rasa
+// on a Fabric target is bundled into the Soul Link jar instead).
+def terraRasaMarker = "-mc${minecraft_version}-neoforge-"
+def terraRasaJars = configurations.named('runtimeClasspath').map { configuration ->
+    configuration.incoming.artifactView { it.lenient(true) }.files.filter { file ->
+        file.name.contains(terraRasaMarker)
+    }
+}
+
+def integrationMods = neoforgeLoader
+        ? files(tasks.named(runtimeJarTask), terraRasaJars)
+        : tasks.named(runtimeJarTask)
 
 def prepareIntegrationServer = registerServerInstall('prepareIntegrationServer',
-        'Assembles a production-style Fabric dedicated server with the built Soul Link jar.', integrationServerDirectory,
-        tasks.named(runtimeJarTask))
+        'Assembles a production-style dedicated server with the built Soul Link jar.',
+        integrationServerDirectory, integrationMods)
 
 registerSuite('integrationTest', 'Runs the real dedicated-server integration suite (Python harness in testing/).',
         integrationServerDirectory, prepareIntegrationServer, [])

@@ -18,7 +18,6 @@ import com.google.gson.JsonObject;
 import dev.soullink.SoulLink;
 import dev.soullink.SoulLinkConfig;
 import dev.soullink.MinecraftCompat;
-import dev.soullink.compat.WthitCompatibility;
 import dev.soullink.game.SharedEffects;
 import dev.soullink.game.SharedVitality;
 import dev.soullink.lobby.LobbyService;
@@ -480,7 +479,7 @@ public final class RunCoordinator {
                 + "This can take a few seconds.").withStyle(ChatFormatting.GRAY));
         this.swappedThisTick = true;
         moveEveryoneToLobby();
-        WthitCompatibility.beforeWorldReplacement();
+        SoulLink.platform().beforeWorldReplacement();
         RunManifest manifest = this.preparation.takeReady();
         CanonicalActivationService.Activation result;
         try {

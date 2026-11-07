@@ -1,0 +1,36 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="Apache-2.0"
+issueTrackerUrl="https://github.com/qwasdf-1/soul-link/issues"
+
+[[mods]]
+modId="soullink"
+version="${version}"
+displayName="Soul Link"
+description="Cooperative Soul Link speedruns on dedicated servers and integrated single-player/LAN worlds."
+
+# The table name is this mod's own id: NeoForge reads [[dependencies.<modId>]] for each mod's
+# dependencies, and the modId field inside each entry names the dependency.
+[[dependencies.soullink]]
+modId="neoforge"
+type="required"
+versionRange="[${loader_version},)"
+ordering="NONE"
+side="SERVER"
+
+[[dependencies.soullink]]
+modId="minecraft"
+type="required"
+versionRange="[${minecraft_version}]"
+ordering="NONE"
+side="SERVER"
+
+[[dependencies.soullink]]
+modId="terrarasa"
+type="required"
+versionRange="[${terra_rasa_version},)"
+ordering="NONE"
+side="SERVER"
+
+[[mixins]]
+config="${mixins_config}"

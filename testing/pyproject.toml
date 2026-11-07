@@ -18,4 +18,5 @@ addopts = "-ra --strict-markers -m \"not slow and not modpack\""
 markers = [
     "slow: long-running stress or longevity scenarios",
     "modpack: needs the reference modpack server (./gradlew modpackTest)",
+    "neoforge: applies to the NeoForge install only (./gradlew integrationTest -Ploader=neoforge)",
 ]

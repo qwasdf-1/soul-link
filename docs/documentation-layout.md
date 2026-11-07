@@ -5,6 +5,7 @@
 | Product scope and source-of-truth map | `project-reference.md` |
 | Present behavior | `current-state.md`, `gameplay.md`, `configuration.md` |
 | Runtime ownership and durable choices | `architecture.md`, `architecture-decisions.md` |
+| Loader port decision and plan | `design/neoforge-port.md` |
 | Reset, persistence, performance, compatibility | `reference.md` |
 | Product requests and open design questions | `roadmap.md` |
 | Release workflow | `publishing.md` |
