@@ -191,12 +191,14 @@ loader:
    every hook mapped above. The loader overlay was compiled against NeoForge
    21.11.48 and the legacy 1.21.11 source set as well, so the shared overlay is
    source-compatible across the covered NeoForge builds.
-3. **Integration verification.** Outstanding: run the existing Fabric suites on
-   NeoForge for 26.2 and fix any semantics surfaced above. The integration server
-   assembler already supports NeoForge (install script, `libraries/`, `mods/`).
-4. **Matrix, CI, and releases.** Outstanding: the workflow steps, Modrinth version
-   loaders/dependencies, and CurseForge game versions still pass one loader's
-   properties for every row.
+3. **Integration verification.** Done by inspection of a live NeoForge 26.2 server
+   (library, test host and Soul Link together): both mods' commands answer, and a
+   full Terra Rasa activation committed. The Python suite itself has not been
+   re-run against NeoForge yet; it is installed by Gradle, but the live-suite run
+   remains outstanding.
+4. **Matrix, CI, and releases.** Done: the workflows, Modrinth version
+   loaders/dependencies and CurseForge game versions are per-(Minecraft, loader),
+   and the release verifier counts one jar per row of the target matrix.
 5. **Docs and public wording.** Done: README, `docs/project-reference.md`,
    `docs/publishing.md`, `docs/reference.md`, and `docs/architecture-decisions.md`
    describe both loaders.
