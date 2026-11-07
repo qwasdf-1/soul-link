@@ -12,10 +12,13 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.damagesource.DamageSource;
+import net.neoforged.bus.api.IEventBus;
+import net.minecraft.core.registries.Registries;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.registries.RegisterEvent;
 import net.neoforged.neoforge.event.TagsUpdatedEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
@@ -37,7 +40,15 @@ public final class SoulLinkNeoForge {
     /** The server that is running this mod, taken from server start; reload hooks need it. */
     private static @org.jspecify.annotations.Nullable MinecraftServer runningServer;
 
-    public SoulLinkNeoForge() {
+    public SoulLinkNeoForge(IEventBus modEventBus) {
+        // The built-in registries are already frozen when a mod constructor runs, so the lobby
+        // ticket type registers on the mod bus's registry event instead: that fires while vanilla
+        // still accepts additions to them.
+        modEventBus.addListener(RegisterEvent.class, event -> {
+            if (event.getRegistryKey() == Registries.TICKET_TYPE) {
+                SoulLink.registerTicketTypes();
+            }
+        });
         SoulLinkRuntime.register(new NeoForgePlatform());
     }
 

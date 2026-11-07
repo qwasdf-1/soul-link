@@ -22,9 +22,11 @@ import net.minecraft.world.phys.Vec3;
 public final class LobbyService {
     public static final Identifier DIMENSION = Identifier.fromNamespaceAndPath(SoulLink.MOD_ID, "lobby");
     public static final ResourceKey<Level> KEY = ResourceKey.create(Registries.DIMENSION, DIMENSION);
-    /** Non-persistent: the lobby re-adds it at every startup. */
-    public static final TicketType TICKET = Registry.register(BuiltInRegistries.TICKET_TYPE,
-            Identifier.fromNamespaceAndPath(SoulLink.MOD_ID, "lobby"), new TicketType(0L, TicketType.FLAG_LOADING));
+    /**
+     * Non-persistent: the lobby re-adds it at every startup. Registered by
+     * {@link SoulLink#registerTicketTypes()} while the built-in registries still accept additions.
+     */
+    public static TicketType TICKET;
     private static final int PLATFORM_Y = 64;
     private static final int PLATFORM_RADIUS = 6;
     private static final int BARRIER_RADIUS = PLATFORM_RADIUS + 1;

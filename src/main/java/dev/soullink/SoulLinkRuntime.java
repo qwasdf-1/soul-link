@@ -29,7 +29,9 @@ public final class SoulLinkRuntime {
         config.validate();
         // Dimensions that runs never reset (the lobby, external ones) keep the world's original seed.
         PinnedSeed.setPolicy(config.dimensionPolicy());
-        // Registers the lobby ticket type while built-in registries are still open.
+        // Ticket types are registered by each loader's entrypoint at the moment the built-in
+        // registries still accept additions (see SoulLink.registerTicketTypes), so by now the
+        // lobby ticket type is in place and only needs to be observed here.
         SoulLink.LOGGER.debug("Lobby ticket type: {}", LobbyService.TICKET);
 
         platform.registerCommands(dispatcher -> SoulLinkCommands.register(dispatcher, config.debugCommands));

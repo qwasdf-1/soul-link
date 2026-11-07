@@ -25,6 +25,10 @@ public final class SoulLinkInitializer implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        // A Fabric entrypoint runs while the built-in registries still accept additions, which is
+        // the moment the lobby ticket type must be registered; NeoForge does this from its
+        // registry event.
+        SoulLink.registerTicketTypes();
         SoulLinkRuntime.register(new FabricPlatform());
     }
 
