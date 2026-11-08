@@ -186,6 +186,16 @@ loader:
   `-Ploader=fabric -Ploom_version=… -Pfabric_loader_version=… -Pfabric_api_version=…`)
   and only use `remapJar` on Fabric's 1.21.11 target.
 
+- The Fabric toolchain versions are the newest published builds that actually
+  build the target: the newest Fabric API build for that Minecraft version, and
+  the newest Loom line that supports it (1.17.x for 1.21.11, 1.18.x for 26.x;
+  1.19.4 also builds every supported version once Gradle is 9.8 or newer). The
+  Gradle wrapper is pinned to 9.9.0 for exactly that reason: Loom 1.19.x requires
+  a Gradle 9.8+ JVM to resolve, and the buildscript resolves fabric-loom on every
+  row - NeoForge rows included, because they carry no loom_version of their own.
+  Minecraft 26.4 is deliberately not a row: no published Loom knows that version
+  yet, so the failure would be upstream, not ours.
+
 ## Phases
 
 1. **Build skeleton and metadata.** Done. Conditional plugin application, loader
