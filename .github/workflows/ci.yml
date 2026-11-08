@@ -39,10 +39,33 @@ jobs:
         with:
           path: soul-link
 
+      - name: Resolve the Terra Rasa ref
+        id: terra-rasa-ref
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            ref="${{ github.event.pull_request.head.ref }}"
+          else
+            ref="${{ github.ref_name }}"
+          fi
+          # Terra Rasa carries the loader-aware build, so a NeoForge row must substitute a checkout
+          # that can build the -neoforge artifact main cannot. Use the ref this run is testing when
+          # Terra Rasa has that branch, and fall back to main otherwise.
+          if refs=$(git ls-remote --heads https://github.com/qwasdf-1/terra-rasa.git "$ref" 2>&1); then
+            if [ -n "$refs" ]; then
+              echo "ref=$ref" >> "$GITHUB_OUTPUT"
+            else
+              echo "ref=main" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "Could not list Terra Rasa's branches: $refs" >&2
+            exit 1
+          fi
+
       - uses: actions/checkout@v7
         with:
           repository: qwasdf-1/terra-rasa
-          ref: main
+          ref: ${{ steps.terra-rasa-ref.outputs.ref }}
           path: terra-rasa
 
       - name: Install the Gradle JVM
@@ -142,11 +165,35 @@ jobs:
         with:
           path: soul-link
 
+      - name: Resolve the Terra Rasa ref
+        id: terra-rasa-ref
+        if: matrix.loader == 'fabric'
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            ref="${{ github.event.pull_request.head.ref }}"
+          else
+            ref="${{ github.ref_name }}"
+          fi
+          # Terra Rasa carries the loader-aware build, so a NeoForge row must substitute a checkout
+          # that can build the -neoforge artifact main cannot. Use the ref this run is testing when
+          # Terra Rasa has that branch, and fall back to main otherwise.
+          if refs=$(git ls-remote --heads https://github.com/qwasdf-1/terra-rasa.git "$ref" 2>&1); then
+            if [ -n "$refs" ]; then
+              echo "ref=$ref" >> "$GITHUB_OUTPUT"
+            else
+              echo "ref=main" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "Could not list Terra Rasa's branches: $refs" >&2
+            exit 1
+          fi
+
       - uses: actions/checkout@v7
         if: matrix.loader == 'fabric'
         with:
           repository: qwasdf-1/terra-rasa
-          ref: main
+          ref: ${{ steps.terra-rasa-ref.outputs.ref }}
           path: terra-rasa
 
       - name: Install the Gradle JVM
