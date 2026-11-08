@@ -62,6 +62,7 @@ processResources {
             minecraft_version: minecraftVersion,
             loader: loader,
             loader_version: neoforgeLoader ? rootProject.neoforge_version : rootProject.fabric_loader_version,
+            fabric_api_version: rootProject.fabric_api_version,
             java_version: javaVersion.toString(),
             terra_rasa_version: rootProject.terra_rasa_version,
             mixins_config: minecraftFamily == 'legacy' ? 'soullink-legacy.mixins.json' : 'soullink-modern.mixins.json'

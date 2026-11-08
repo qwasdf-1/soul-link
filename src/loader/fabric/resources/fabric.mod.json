@@ -19,7 +19,7 @@
     "fabricloader": ">=${loader_version}",
     "minecraft": "${minecraft_version}",
     "java": ">=${java_version}",
-    "fabric-api": "*",
+    "fabric-api": ">=${fabric_api_version}",
     "terrarasa": ">=${terra_rasa_version}"
   }
 }
