@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 0.5.1
+
+### Changed
+
+- Damage reports are one short line: `♥ Alice took 3.0 damage (17.0/20.0)`, with the shared pool
+  shown as current over maximum. It read "Alice, Bob lost 3.0 health. Shared health: 17.0/20.0."
+- Every participant death is reported on its own line, `Alice died`, in all outcomes, with the
+  run failure announced below it when the run actually ends. "The run continues." is gone - the
+  absence of the failure announcement says it.
+- Fabric builds now require the Fabric API build they were compiled against as a minimum, so an
+  older API build reports a dependency error instead of failing at runtime.
+
 ## 0.5.0
 
 ### Added
