@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 0.5.0
+
+### Added
+
+- Build for NeoForge beside Fabric, with one artifact per Minecraft version and loader. NeoForge
+  builds cover 1.21.11, 26.1.2, 26.2 and 26.3; 26.1 and 26.1.1 stay Fabric-only because NeoForge
+  publishes no stable build for them. Each build resolves the Terra Rasa artifact built for the
+  same loader.
+- NeoForge event bindings that fire where the Fabric API events this mod has always used fire:
+  lobby damage protection through LivingIncomingDamageEvent, death and respawn at the same points
+  in vanilla's call order, and data-pack reload completion through TagsUpdatedEvent.
+
+### Fixed
+
+- Register the lobby's chunk ticket type on NeoForge's registry event, so the lobby dimension
+  loads instead of tripping over an unregistered ticket type.
+
 ## 0.4.3
 
 ### Added

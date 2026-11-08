@@ -190,7 +190,7 @@ loader:
 
 1. **Build skeleton and metadata.** Done. Conditional plugin application, loader
    source sets, both metadata files, and the loader-aware Terra Rasa substitution;
-   `jar` produces `soullink-mc26.2-neoforge-0.4.3.jar`.
+   `jar` produces `soullink-mc26.2-neoforge-0.5.0.jar`.
 2. **Entrypoint port.** Done. `ModPlatform` + `SoulLinkRuntime` in `src/main`, the
    Fabric adapter in the previous entrypoint file, and the NeoForge adapter with
    every hook mapped above. The loader overlay was compiled against NeoForge
