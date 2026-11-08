@@ -8,6 +8,7 @@ import java.util.StringJoiner;
 
 import net.minecraft.network.protocol.game.ClientboundHurtAnimationPacket;
 import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -21,6 +22,8 @@ import net.minecraft.util.Mth;
  * players regenerating on the same tick heal the pool once, not twice.
  */
 public final class SharedVitality {
+    /** The heart the damage report is marked with, as a code point so the source stays ASCII. */
+    private static final String HEART = "\u2665";
     private final Map<UUID, Snapshot> lastSynced = new HashMap<>();
     private float health = -1.0F;
     private int food = 20;
@@ -97,9 +100,11 @@ public final class SharedVitality {
                     damage += taken;
                 }
             }
-            String message = String.format(java.util.Locale.ROOT,
-                    "%s lost %.1f health. Shared health: %.1f/%.1f.", names, damage, this.health, maxHealth);
-            Component component = Component.literal(message);
+            // Readable mid-fight: the heart, who took the hit, and the pool it came from as
+            // <current>/<max> so the maximum is only ever a denominator.
+            Component component = Component.literal(HEART + " ").withStyle(ChatFormatting.RED)
+                    .append(Component.literal(String.format(java.util.Locale.ROOT,
+                            "%s took %.1f damage (%.1f/%.1f)", names, damage, this.health, maxHealth)));
             for (ServerPlayer player : participants) {
                 player.sendSystemMessage(component, false);
             }

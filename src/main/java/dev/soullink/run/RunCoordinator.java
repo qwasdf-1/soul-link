@@ -721,20 +721,26 @@ public final class RunCoordinator {
             DeathRules.Outcome outcome = DeathRules.afterDeath(this.state.sharedVitality,
                     this.state.soulLinkHardcore, vanillaHardcore,
                     this.state.participants, this.state.eliminatedParticipants);
-            if (outcome == DeathRules.Outcome.END_RUN) {
-                endRun(SoulLinkState.Result.DEFEAT, player.getGameProfile().name() + " died");
-            } else if (outcome == DeathRules.Outcome.TEAM_WIPE) {
-                endRun(SoulLinkState.Result.DEFEAT, "the team was eliminated");
+            String name = player.getGameProfile().name();
+            if (outcome == DeathRules.Outcome.END_RUN || outcome == DeathRules.Outcome.TEAM_WIPE) {
+                // Every death is its own line in the log, and the run-level failure is announced
+                // below it: shared vitality ends a run on the first death because the pool is one,
+                // while vanilla hardcore reaches it only when the last participant is gone.
+                broadcast(Component.literal(name + " died").withStyle(ChatFormatting.YELLOW));
+                if (outcome == DeathRules.Outcome.END_RUN) {
+                    endRun(SoulLinkState.Result.DEFEAT, name + " died");
+                } else {
+                    endRun(SoulLinkState.Result.DEFEAT, "the team was eliminated");
+                }
             } else {
                 save();
                 if (vanillaHardcore) {
                     int remaining = this.state.participants.size() - this.state.eliminatedParticipants.size();
-                    broadcast(Component.literal(player.getGameProfile().name() + " was eliminated. " + remaining
+                    broadcast(Component.literal(name + " died and was eliminated. " + remaining
                             + " of " + this.state.participants.size() + " participants remain.")
                             .withStyle(ChatFormatting.YELLOW));
                 } else {
-                    broadcast(Component.literal(player.getGameProfile().name() + " died. The run continues.")
-                            .withStyle(ChatFormatting.YELLOW));
+                    broadcast(Component.literal(name + " died").withStyle(ChatFormatting.YELLOW));
                 }
             }
         }

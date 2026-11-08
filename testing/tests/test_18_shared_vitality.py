@@ -38,8 +38,12 @@ def test_shared_vitality_rule_is_persisted_and_snapshotted(server):
     server.rcon("kill Alice")
     players[0].respawn()
     players[0].wait_for(lambda state: state.health is not None and state.health > 0, 15, "vanilla respawn in an unlinked run")
-    assert any("Alice died. The run continues." in message
-               for message in players[0].state.messages[death_message_start:])
+    players[0].wait_for(
+        lambda state: any("Alice died" in message
+                          for message in state.messages[death_message_start:]),
+        10,
+        "the death announcement to arrive",
+    )
     assert server.status()["status"] == "RUNNING"
 
     server.rcon("soullink rules sharedVitality true")
