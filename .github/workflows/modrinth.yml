@@ -79,7 +79,6 @@ jobs:
       project_id: ${{ steps.project.outputs.project_id }}
       terrarasa_id: ${{ steps.terra_rasa.outputs.project_id }}
       fabric_api_id: ${{ steps.fabric_api.outputs.project_id }}
-      neoforge_id: ${{ steps.neoforge.outputs.project_id }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -124,15 +123,6 @@ jobs:
           [[ "$(jq -er '.slug' <<< "$project")" == "fabric-api" ]]
           echo "project_id=$(jq -er '.id' <<< "$project")" >> "$GITHUB_OUTPUT"
 
-      # NeoForge builds depend on the loader itself instead of Fabric API.
-      - name: Resolve NeoForge project ID
-        id: neoforge
-        run: |
-          set -euo pipefail
-          project="$(curl --fail-with-body --silent --show-error -H 'User-Agent: qwasdf-1/soul-link-github-publisher' https://api.modrinth.com/v2/project/neoforge)"
-          [[ "$(jq -er '.slug' <<< "$project")" == "neoforge" ]]
-          echo "project_id=$(jq -er '.id' <<< "$project")" >> "$GITHUB_OUTPUT"
-
   publish:
     name: publish (${{ matrix.minecraft_version }} ${{ matrix.loader }})
     needs: [release, project]
@@ -148,7 +138,6 @@ jobs:
       PROJECT_ID: ${{ needs.project.outputs.project_id }}
       TERRARASA_ID: ${{ needs.project.outputs.terrarasa_id }}
       FABRIC_API_ID: ${{ needs.project.outputs.fabric_api_id }}
-      NEOFORGE_ID: ${{ needs.project.outputs.neoforge_id }}
       VERSION: ${{ needs.release.outputs.version }}
       MINECRAFT: ${{ matrix.minecraft_version }}
       LOADER: ${{ matrix.loader }}
@@ -186,7 +175,10 @@ jobs:
             neoforge)
               version_suffix="-neoforge"
               loader_label=" NeoForge"
-              loader_dependency="$NEOFORGE_ID"
+              # NeoForge is a loader on Modrinth, not a project that can be depended on: there is
+              # no project there to point at, and the loaders field below already declares it.
+              # CurseForge treats the same fact as a loader relation rather than a dependency.
+              loader_dependency=""
               terrarasa_dependency_type="required"
               ;;
             *)
@@ -233,7 +225,8 @@ jobs:
                 and .environment == $environment
                 and .featured == false
                 and .status == "listed"
-                and any(.dependencies[]; .project_id == $loader_dependency and .dependency_type == "required")
+                and (if $loader_dependency == "" then (.dependencies | length) == 1
+                     else any(.dependencies[]; .project_id == $loader_dependency and .dependency_type == "required") end)
                 and any(.dependencies[]; .project_id == $terrarasa and .dependency_type == $terrarasa_type)' \
               "$existing_response" >/dev/null && [[ "$existing_sha512" == "$expected_sha512" ]]; then
               echo "Modrinth version $version_number already matches the release asset; skipping upload."
@@ -249,8 +242,11 @@ jobs:
 
           dependencies="$(jq -cn --arg loader_dependency "$loader_dependency" \
             --arg terrarasa "$TERRARASA_ID" --arg terrarasa_type "$terrarasa_dependency_type" \
-            '[{project_id:$loader_dependency,dependency_type:"required"},{project_id:$terrarasa,dependency_type:$terrarasa_type}]')"
-          test "$(jq 'length' <<< "$dependencies")" -eq 2 || {
+            'if $loader_dependency == "" then [{project_id:$terrarasa,dependency_type:$terrarasa_type}]
+             else [{project_id:$loader_dependency,dependency_type:"required"},{project_id:$terrarasa,dependency_type:$terrarasa_type}] end')"
+          expected_dependencies=2
+          [ -n "$loader_dependency" ] || expected_dependencies=1
+          test "$(jq 'length' <<< "$dependencies")" -eq "$expected_dependencies" || {
             echo "Could not build the Modrinth dependency list for $LOADER" >&2
             exit 1
           }
