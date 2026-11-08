@@ -4,6 +4,10 @@ pluginManagement {
             name = 'Fabric'
             url = 'https://maven.fabricmc.net/'
         }
+        maven {
+            name = 'NeoForged'
+            url = 'https://maven.neoforged.net/releases'
+        }
         mavenCentral()
         gradlePluginPortal()
     }
@@ -16,6 +20,10 @@ rootProject.name = 'soullink'
 // pass -PterraRasaPath=<dir> to use another checkout, or -PterraRasaPath= to use the published artifact.
 def terraRasaPath = providers.gradleProperty('terraRasaPath').getOrElse('../terra-rasa').trim()
 def minecraftVersion = providers.gradleProperty('minecraft_version').getOrElse('26.2')
+// The substituted artifact carries the loader tag, so a NeoForge build resolves Terra Rasa's NeoForge
+// artifact and a Fabric build its Fabric one. Read the `loader` property the way the build does.
+def neoforgeLoader = providers.gradleProperty('loader').getOrElse('fabric').toString().trim().toLowerCase() == 'neoforge'
+def terraRasaArtifact = "dev.terrarasa:terra-rasa-mc${minecraftVersion}${neoforgeLoader ? '-neoforge' : ''}"
 if (terraRasaPath) {
     def terraRasa = file(terraRasaPath)
     if (!new File(terraRasa, 'settings.gradle').isFile()) {
@@ -23,7 +31,7 @@ if (terraRasaPath) {
     }
     includeBuild(terraRasa) {
         dependencySubstitution {
-            substitute module("dev.terrarasa:terra-rasa-mc${minecraftVersion}") using project(':')
+            substitute module("${terraRasaArtifact}") using project(':')
         }
     }
 }

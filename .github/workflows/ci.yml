@@ -25,7 +25,7 @@ jobs:
         run: python3 scripts/check_doc_boundary.py
 
   build:
-    name: build (${{ matrix.minecraft_version }})
+    name: build (${{ matrix.minecraft_version }} ${{ matrix.loader }})
     needs: targets
     runs-on: ubuntu-latest
     strategy:
@@ -39,44 +39,116 @@ jobs:
         with:
           path: soul-link
 
+      - name: Resolve the Terra Rasa ref
+        id: terra-rasa-ref
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            ref="${{ github.event.pull_request.head.ref }}"
+          else
+            ref="${{ github.ref_name }}"
+          fi
+          # Terra Rasa carries the loader-aware build, so a NeoForge row must substitute a checkout
+          # that can build the -neoforge artifact main cannot. Use the ref this run is testing when
+          # Terra Rasa has that branch, and fall back to main otherwise.
+          if refs=$(git ls-remote --heads https://github.com/qwasdf-1/terra-rasa.git "$ref" 2>&1); then
+            if [ -n "$refs" ]; then
+              echo "ref=$ref" >> "$GITHUB_OUTPUT"
+            else
+              echo "ref=main" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "Could not list Terra Rasa's branches: $refs" >&2
+            exit 1
+          fi
+
       - uses: actions/checkout@v7
         with:
           repository: qwasdf-1/terra-rasa
-          ref: main
+          ref: ${{ steps.terra-rasa-ref.outputs.ref }}
           path: terra-rasa
 
-      - name: Install Java ${{ matrix.java_version }}
+      - name: Install the Gradle JVM
         uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: ${{ matrix.java_version }}
+          # The row's java_version is the compile toolchain, passed below as -Pjava_version. The
+          # Gradle JVM itself must be 25 or newer: both repos' buildscripts resolve fabric-loom
+          # 1.18.4 on every row (NeoForge rows carry no loom_version of their own), and that
+          # version asks for a JVM 25+ Gradle to resolve its artifacts. The 1.21.11 rows therefore
+          # compile to 21 bytecode under a 25 Gradle, which is how the local builds run.
+          java-version: '25'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Build and publish Terra Rasa for Minecraft ${{ matrix.minecraft_version }}
+      # Each target row carries the loader's own toolchain properties: Loom, Fabric Loader and
+      # Fabric API for Fabric rows, ModDevGradle and NeoForge for NeoForge rows. Terra Rasa is
+      # published to Maven Local with the same loader, so the substituted Soul Link dependency is
+      # the matching artifact.
+      - name: Build and publish Terra Rasa for Minecraft ${{ matrix.minecraft_version }} (${{ matrix.loader }})
         working-directory: terra-rasa
-        run: >-
-          ./gradlew publishToMavenLocal
-          -Ploom_version=${{ matrix.loom_version }}
-          -Pminecraft_version=${{ matrix.minecraft_version }}
-          -Pfabric_loader_version=${{ matrix.fabric_loader_version }}
-          -Pfabric_api_version=${{ matrix.fabric_api_version }}
-          -Pjava_version=${{ matrix.java_version }}
+        run: |
+          set -euo pipefail
+          case "${{ matrix.loader }}" in
+            fabric)
+              args=(
+                -Ploader=${{ matrix.loader }}
+                -Ploom_version=${{ matrix.loom_version }}
+                -Pfabric_loader_version=${{ matrix.fabric_loader_version }}
+                -Pfabric_api_version=${{ matrix.fabric_api_version }}
+              )
+              ;;
+            neoforge)
+              args=(
+                -Ploader=${{ matrix.loader }}
+                -Pmoddev_version=${{ matrix.moddev_version }}
+                -Pneoforge_version=${{ matrix.neoforge_version }}
+              )
+              ;;
+            *)
+              echo "Unsupported loader '${{ matrix.loader }}' for Minecraft ${{ matrix.minecraft_version }}" >&2
+              exit 1
+              ;;
+          esac
+          ./gradlew publishToMavenLocal "${args[@]}" \
+            -Pminecraft_version=${{ matrix.minecraft_version }} \
+            -Pjava_version=${{ matrix.java_version }}
 
-      - name: Build and unit tests for Minecraft ${{ matrix.minecraft_version }}
-        run: >-
-          ./gradlew build
-          -PterraRasaPath=../terra-rasa
-          -Ploom_version=${{ matrix.loom_version }}
-          -Pminecraft_version=${{ matrix.minecraft_version }}
-          -Pfabric_loader_version=${{ matrix.fabric_loader_version }}
-          -Pfabric_api_version=${{ matrix.fabric_api_version }}
-          -Pjava_version=${{ matrix.java_version }}
+      - name: Build and unit tests for Minecraft ${{ matrix.minecraft_version }} (${{ matrix.loader }})
+        run: |
+          set -euo pipefail
+          case "${{ matrix.loader }}" in
+            fabric)
+              args=(
+                -Ploader=${{ matrix.loader }}
+                -Ploom_version=${{ matrix.loom_version }}
+                -Pfabric_loader_version=${{ matrix.fabric_loader_version }}
+                -Pfabric_api_version=${{ matrix.fabric_api_version }}
+              )
+              ;;
+            neoforge)
+              args=(
+                -Ploader=${{ matrix.loader }}
+                -Pmoddev_version=${{ matrix.moddev_version }}
+                -Pneoforge_version=${{ matrix.neoforge_version }}
+              )
+              ;;
+            *)
+              echo "Unsupported loader '${{ matrix.loader }}' for Minecraft ${{ matrix.minecraft_version }}" >&2
+              exit 1
+              ;;
+          esac
+          ./gradlew build -PterraRasaPath=../terra-rasa "${args[@]}" \
+            -Pminecraft_version=${{ matrix.minecraft_version }} \
+            -Pjava_version=${{ matrix.java_version }}
 
   # The real dedicated-server suite downloads vanilla servers and takes several minutes per target.
+  # The suite still installs Fabric servers only, so NeoForge rows are skipped rather than run:
+  # the NeoForge install path in gradle/integration-server.gradle and testing/ is not validated by
+  # a live run yet.
   integration:
-    name: integration (${{ matrix.minecraft_version }})
+    name: integration (${{ matrix.minecraft_version }} ${{ matrix.loader }})
     if: github.event_name == 'workflow_dispatch'
     needs: targets
     runs-on: ubuntu-latest
@@ -89,28 +161,60 @@ jobs:
         working-directory: soul-link
     steps:
       - uses: actions/checkout@v7
+        if: matrix.loader == 'fabric'
         with:
           path: soul-link
 
+      - name: Resolve the Terra Rasa ref
+        id: terra-rasa-ref
+        if: matrix.loader == 'fabric'
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            ref="${{ github.event.pull_request.head.ref }}"
+          else
+            ref="${{ github.ref_name }}"
+          fi
+          # Terra Rasa carries the loader-aware build, so a NeoForge row must substitute a checkout
+          # that can build the -neoforge artifact main cannot. Use the ref this run is testing when
+          # Terra Rasa has that branch, and fall back to main otherwise.
+          if refs=$(git ls-remote --heads https://github.com/qwasdf-1/terra-rasa.git "$ref" 2>&1); then
+            if [ -n "$refs" ]; then
+              echo "ref=$ref" >> "$GITHUB_OUTPUT"
+            else
+              echo "ref=main" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "Could not list Terra Rasa's branches: $refs" >&2
+            exit 1
+          fi
+
       - uses: actions/checkout@v7
+        if: matrix.loader == 'fabric'
         with:
           repository: qwasdf-1/terra-rasa
-          ref: main
+          ref: ${{ steps.terra-rasa-ref.outputs.ref }}
           path: terra-rasa
 
-      - name: Install Java ${{ matrix.java_version }}
+      - name: Install the Gradle JVM
+        if: matrix.loader == 'fabric'
         uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: ${{ matrix.java_version }}
+          # Same rule as the build job: the Gradle JVM is 25 (fabric-loom 1.18.4 requires it to
+          # resolve), the row's java_version stays the compile toolchain (-Pjava_version below).
+          java-version: '25'
 
       - name: Set up Gradle
+        if: matrix.loader == 'fabric'
         uses: gradle/actions/setup-gradle@v6
 
       - name: Build and publish Terra Rasa for Minecraft ${{ matrix.minecraft_version }}
+        if: matrix.loader == 'fabric'
         working-directory: terra-rasa
         run: >-
           ./gradlew publishToMavenLocal
+          -Ploader=fabric
           -Ploom_version=${{ matrix.loom_version }}
           -Pminecraft_version=${{ matrix.minecraft_version }}
           -Pfabric_loader_version=${{ matrix.fabric_loader_version }}
@@ -118,14 +222,17 @@ jobs:
           -Pjava_version=${{ matrix.java_version }}
 
       - name: Install uv
+        if: matrix.loader == 'fabric'
         uses: astral-sh/setup-uv@v6
 
       - name: Integration suite for Minecraft ${{ matrix.minecraft_version }}
+        if: matrix.loader == 'fabric'
         env:
           MC_TEST_PROTOCOL_VERSION: ${{ matrix.protocol_version }}
         run: >-
           ./gradlew integrationTest
           -PterraRasaPath=../terra-rasa
+          -Ploader=fabric
           -Ploom_version=${{ matrix.loom_version }}
           -Pminecraft_version=${{ matrix.minecraft_version }}
           -Pfabric_loader_version=${{ matrix.fabric_loader_version }}

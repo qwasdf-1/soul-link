@@ -4,85 +4,92 @@ import dev.soullink.command.SoulLinkCommands;
 import dev.soullink.lobby.LobbyService;
 import dev.soullink.run.RunCoordinator;
 import dev.terrarasa.PinnedSeed;
-import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
-import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 
-/** Fabric entrypoint: wires Soul Link into server, tick, player and death events. */
-public final class SoulLinkInitializer implements ModInitializer {
+/**
+ * Loader-neutral wiring, shared by every loader entrypoint.
+ *
+ * <p>A loader's entrypoint builds a {@link ModPlatform} and calls {@link #register} once, which loads
+ * the configuration, installs the seed policy, registers the lobby ticket type and subscribes every
+ * server, tick, player, damage and death hook. Nothing here differs between Fabric and NeoForge; the
+ * difference lives entirely in the overlay.
+ */
+public final class SoulLinkRuntime {
+    private SoulLinkRuntime() {
+    }
 
-    @Override
-    public void onInitialize() {
-        SoulLinkConfig config = SoulLinkConfig.load(SoulLink.configPath());
+    /** Registers lifecycle hooks and optional integrations. Call exactly once per mod load. */
+    public static void register(ModPlatform platform) {
+        SoulLink.setPlatform(platform);
+
+        SoulLinkConfig config = SoulLinkConfig.load(platform.configFile(SoulLink.CONFIG_FILE));
         config.normalize();
         config.validate();
         // Dimensions that runs never reset (the lobby, external ones) keep the world's original seed.
         PinnedSeed.setPolicy(config.dimensionPolicy());
-        // Registers the lobby ticket type while built-in registries are still open.
+        // Ticket types are registered by each loader's entrypoint at the moment the built-in
+        // registries still accept additions (see SoulLink.registerTicketTypes), so by now the
+        // lobby ticket type is in place and only needs to be observed here.
         SoulLink.LOGGER.debug("Lobby ticket type: {}", LobbyService.TICKET);
 
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
-                SoulLinkCommands.register(dispatcher, config.debugCommands));
+        platform.registerCommands(dispatcher -> SoulLinkCommands.register(dispatcher, config.debugCommands));
 
-        ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+        platform.onServerStarted(server -> {
             RunCoordinator started = new RunCoordinator(server, config);
             RunCoordinator.setActive(started);
             started.onServerStarted();
         });
-        ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+        platform.onServerStopping(() -> {
             RunCoordinator coordinator = RunCoordinator.active();
             if (coordinator != null) {
                 coordinator.onServerStopping();
             }
         });
-        ServerLifecycleEvents.END_DATA_PACK_RELOAD.register((server, resourceManager, success) -> {
+        // The coordinator is created when the server starts, so the reload a server performs while
+        // loading its first world has nothing to recheck; only a later `/reload` reaches a run.
+        platform.onDataPacksReloaded(server -> {
             RunCoordinator coordinator = RunCoordinator.active();
-            if (success && coordinator != null) {
+            if (coordinator != null) {
                 coordinator.onDataPacksReloaded();
             }
         });
-        ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
-            RunCoordinator.setActive(null);
-        });
+        platform.onServerStopped(() -> RunCoordinator.setActive(null));
 
         // World lifecycle work runs at the end of a server tick: outside level iteration and packet handling.
-        ServerTickEvents.END_SERVER_TICK.register(server -> {
+        platform.onEndServerTick(server -> {
             RunCoordinator coordinator = RunCoordinator.active();
             if (coordinator != null) {
                 coordinator.tick();
             }
         });
 
-        ServerPlayerEvents.JOIN.register(player -> {
+        platform.onPlayerJoin(player -> {
             RunCoordinator coordinator = RunCoordinator.active();
             if (coordinator != null) {
                 coordinator.onPlayerJoin(player);
             }
         });
-        ServerPlayerEvents.LEAVE.register(player -> {
+        platform.onPlayerLeave(player -> {
             RunCoordinator coordinator = RunCoordinator.active();
             if (coordinator != null) {
                 coordinator.onPlayerLeave(player);
             }
         });
-        ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer, newPlayer, alive) -> {
+        platform.onPlayerRespawn(player -> {
             RunCoordinator coordinator = RunCoordinator.active();
             if (coordinator != null) {
-                coordinator.onPlayerRespawn(newPlayer);
+                coordinator.onPlayerRespawn(player);
             }
         });
-        ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
+
+        platform.onAllowDamage((entity, source) -> {
             RunCoordinator coordinator = RunCoordinator.active();
             return !(entity instanceof ServerPlayer player && coordinator != null
                     && coordinator.shouldCancelLobbyDamage(player, source));
         });
-        ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
+        platform.onEntityDeath((entity, source) -> {
             RunCoordinator coordinator = RunCoordinator.active();
             if (coordinator == null) {
                 return;

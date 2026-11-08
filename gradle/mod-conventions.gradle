@@ -1,14 +1,19 @@
 // Shared setup for the mods in this build.
-// Applied after the Loom plugin; `modArchiveName` must be set before applying.
+// Applied after the platform plugin; `modArchiveName` must be set before applying.
 
 def javaVersion = rootProject.java_version.toInteger()
 def minecraftVersion = rootProject.minecraft_version
 def minecraftFamily = minecraftVersion.startsWith('1.') ? 'legacy' : 'modern'
+// fabric (default) or neoforge; selects metadata, dependencies and the entrypoint overlay.
+def loader = rootProject.findProperty('loader') ?: 'fabric'
+def obfuscatedMinecraft = minecraftVersion.startsWith('1.')
+def neoforgeLoader = loader == 'neoforge'
 
 group = rootProject.maven_group
 version = rootProject.mod_version
 base {
-    archivesName = "${project.ext.modArchiveName}-mc${minecraftVersion}"
+    // The loader tag keeps Fabric and NeoForge artifacts of the same game version apart.
+    archivesName = "${project.ext.modArchiveName}-mc${minecraftVersion}${neoforgeLoader ? '-neoforge' : ''}"
 }
 
 repositories {
@@ -19,14 +24,32 @@ repositories {
 
 sourceSets.main.java.srcDir(rootProject.file("src/versions/${minecraftFamily}/java"))
 sourceSets.main.resources.srcDir(rootProject.file("src/versions/${minecraftFamily}/resources"))
+sourceSets.main.java.srcDir(rootProject.file("src/loader/${loader}/java"))
+sourceSets.main.resources.srcDir(rootProject.file("src/loader/${loader}/resources"))
 
 dependencies {
-    minecraft "com.mojang:minecraft:${minecraftVersion}"
-    def modConfiguration = minecraftFamily == 'legacy' ? 'modImplementation' : 'implementation'
-    add(modConfiguration, "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}")
-    add(modConfiguration, "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}")
-    add(modConfiguration, "dev.terrarasa:terra-rasa-mc${minecraftVersion}:${rootProject.terra_rasa_version}")
-    include "dev.terrarasa:terra-rasa-mc${minecraftVersion}:${rootProject.terra_rasa_version}"
+    if (neoforgeLoader) {
+        // ModDevGradle supplies the NeoForge runtime and the matching Minecraft jars.
+        project.extensions.getByName('neoForge').version = rootProject.neoforge_version
+        // NeoForge has no jar-in-jar equivalent of Loom's `include`, so Terra Rasa stays a declared
+        // dependency (see META-INF/neoforge.mods.toml) and is installed as its own mod.
+        implementation "dev.terrarasa:terra-rasa-mc${minecraftVersion}-neoforge:${rootProject.terra_rasa_version}"
+        // The unit tests exercise loader-neutral logic on the development Minecraft jars, so they
+        // take the same artifacts the main compile uses instead of the production runtime ones. No
+        // loader is activated in the test JVM: no test in either mod touches a loader API.
+        project.gradle.projectsEvaluated {
+            ['testCompileClasspath', 'testRuntimeClasspath'].each { name ->
+                configurations.named(name).get().extendsFrom(configurations.named('modDevCompileDependencies'))
+            }
+        }
+    } else {
+        minecraft "com.mojang:minecraft:${minecraftVersion}"
+        def modConfiguration = minecraftFamily == 'legacy' ? 'modImplementation' : 'implementation'
+        add(modConfiguration, "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}")
+        add(modConfiguration, "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}")
+        add(modConfiguration, "dev.terrarasa:terra-rasa-mc${minecraftVersion}:${rootProject.terra_rasa_version}")
+        include "dev.terrarasa:terra-rasa-mc${minecraftVersion}:${rootProject.terra_rasa_version}"
+    }
 
     testImplementation platform('org.junit:junit-bom:5.12.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -35,15 +58,19 @@ dependencies {
 
 processResources {
     def expandedValues = [
-        version: project.version.toString(),
-        minecraft_version: minecraftVersion,
-        loader_version: rootProject.fabric_loader_version,
-        java_version: javaVersion.toString(),
-        terra_rasa_version: rootProject.terra_rasa_version,
-        mixins_config: minecraftFamily == 'legacy' ? 'soullink-legacy.mixins.json' : 'soullink-modern.mixins.json'
+            version: project.version.toString(),
+            minecraft_version: minecraftVersion,
+            loader: loader,
+            loader_version: neoforgeLoader ? rootProject.neoforge_version : rootProject.fabric_loader_version,
+            java_version: javaVersion.toString(),
+            terra_rasa_version: rootProject.terra_rasa_version,
+            mixins_config: minecraftFamily == 'legacy' ? 'soullink-legacy.mixins.json' : 'soullink-modern.mixins.json'
     ]
     inputs.properties expandedValues
     filesMatching('fabric.mod.json') {
+        expand expandedValues
+    }
+    filesMatching('META-INF/neoforge.mods.toml') {
         expand expandedValues
     }
 }
@@ -62,6 +89,11 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
+    if (neoforgeLoader) {
+        // The loader's classloader touches java.lang.invoke internals to set up the game
+        // environment the tests bootstrap, so open it for the test JVM.
+        jvmArgs '--add-opens', 'java.base/java.lang.invoke=ALL-UNNAMED'
+    }
 }
 
 tasks.withType(Jar).configureEach {

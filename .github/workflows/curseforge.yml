@@ -46,10 +46,12 @@ jobs:
           targets="$(jq -c --arg version "$version" '
             [.assets[].name
               | select(startswith("soullink-mc") and endswith("-" + $version + ".jar"))
-              | (ltrimstr("soullink-mc") | rtrimstr("-" + $version + ".jar")) as $minecraft
-              | select($minecraft | test("^[0-9]+(\\.[0-9]+)+$"))
-              | {minecraft_version:$minecraft, jar_name:("soullink-mc" + $minecraft + "-" + $version + ".jar")}]
-            | unique_by(.minecraft_version)
+              | (ltrimstr("soullink-mc") | rtrimstr("-" + $version + ".jar")) as $target
+              | ($target | capture("^(?<minecraft_version>[0-9]+(\\.[0-9]+)+)(?<loader_suffix>-neoforge)?$") // empty)
+              | {minecraft_version:.minecraft_version,
+                 loader:(if .loader_suffix == "-neoforge" then "neoforge" else "fabric" end),
+                 jar_name:("soullink-mc" + $target + "-" + $version + ".jar")}]
+            | unique_by([.minecraft_version, .loader])
           ' <<< "$release_json")"
           test "$(jq 'length' <<< "$targets")" -gt 0 || {
             echo "No Soul Link runtime jars for version $version are attached to $RELEASE_TAG" >&2
@@ -57,8 +59,8 @@ jobs:
           }
 
           if git cat-file -e "$RELEASE_TAG:gradle/minecraft-targets.json" 2>/dev/null; then
-            expected="$(git show "$RELEASE_TAG:gradle/minecraft-targets.json" | jq -c '[.include[].minecraft_version] | unique | sort')"
-            actual="$(jq -c '[.[].minecraft_version] | unique | sort' <<< "$targets")"
+            expected="$(git show "$RELEASE_TAG:gradle/minecraft-targets.json" | jq -c '[.include[] | {minecraft_version, loader: (.loader // "fabric")}] | sort_by([.minecraft_version, .loader])')"
+            actual="$(jq -c '[.[] | {minecraft_version, loader}] | sort_by([.minecraft_version, .loader])' <<< "$targets")"
             test "$actual" = "$expected" || {
               echo "Release jars do not match the tagged Minecraft target matrix" >&2
               echo "Expected: $expected" >&2
@@ -77,8 +79,11 @@ jobs:
     outputs:
       project_id: ${{ steps.project.outputs.project_id }}
       game_versions: ${{ steps.project.outputs.game_versions }}
+      fabric_loader_id: ${{ steps.loaders.outputs.fabric_id }}
+      neoforge_loader_id: ${{ steps.loaders.outputs.neoforge_id }}
       terrarasa_slug: ${{ steps.dependencies.outputs.terrarasa_slug }}
       fabric_api_slug: ${{ steps.dependencies.outputs.fabric_api_slug }}
+      neoforge_slug: ${{ steps.dependencies.outputs.neoforge_slug }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -103,14 +108,39 @@ jobs:
           echo "game_versions=$game_versions" >> "$GITHUB_OUTPUT"
           echo "Resolved CurseForge project: $project_id." >> "$GITHUB_STEP_SUMMARY"
 
+      # The game version map from the resolver above tags every target with the Fabric loader.
+      # Resolve both loader tags here so each publisher file can be tagged with its own loader.
+      - name: Resolve CurseForge loader game versions
+        id: loaders
+        env:
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+          CURSEFORGE_USER_AGENT: qwasdf-1/soul-link-github-publisher
+        run: |
+          set -euo pipefail
+          versions="$(curl --fail-with-body --silent --show-error \
+            -H "User-Agent: $CURSEFORGE_USER_AGENT" \
+            -H "X-Api-Token: $CURSEFORGE_TOKEN" \
+            https://minecraft.curseforge.com/api/game/versions)"
+          for loader in fabric neoforge; do
+            loader_id="$(jq -r --arg loader "$loader" \
+              '[.[] | select((((.name // "") | ascii_downcase) == $loader) or (((.slug // "") | ascii_downcase) == $loader))][0].id // empty' \
+              <<< "$versions")"
+            test -n "$loader_id" || {
+              echo "Could not find CurseForge game version ID for loader '$loader'" >&2
+              exit 1
+            }
+            echo "${loader}_id=$loader_id" >> "$GITHUB_OUTPUT"
+          done
+
       - name: Resolve CurseForge dependencies
         id: dependencies
         run: |
           echo "fabric_api_slug=fabric-api" >> "$GITHUB_OUTPUT"
+          echo "neoforge_slug=neoforge" >> "$GITHUB_OUTPUT"
           echo "terrarasa_slug=${{ vars.CURSEFORGE_TERRA_RASA_PROJECT_SLUG || vars.CURSEFORGE_TERRA_RASA_SLUG || 'terra-rasa' }}" >> "$GITHUB_OUTPUT"
 
   publish:
-    name: publish (${{ matrix.minecraft_version }})
+    name: publish (${{ matrix.minecraft_version }} ${{ matrix.loader }})
     needs: [release, project]
     runs-on: ubuntu-latest
     strategy:
@@ -123,10 +153,14 @@ jobs:
       CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
       PROJECT_ID: ${{ needs.project.outputs.project_id }}
       GAME_VERSIONS: ${{ needs.project.outputs.game_versions }}
+      FABRIC_LOADER_ID: ${{ needs.project.outputs.fabric_loader_id }}
+      NEOFORGE_LOADER_ID: ${{ needs.project.outputs.neoforge_loader_id }}
       TERRARASA_SLUG: ${{ needs.project.outputs.terrarasa_slug }}
       FABRIC_API_SLUG: ${{ needs.project.outputs.fabric_api_slug }}
+      NEOFORGE_SLUG: ${{ needs.project.outputs.neoforge_slug }}
       VERSION: ${{ needs.release.outputs.version }}
       MINECRAFT: ${{ matrix.minecraft_version }}
+      LOADER: ${{ matrix.loader }}
       JAR_NAME: ${{ matrix.jar_name }}
     steps:
       - name: Download and verify release jar
@@ -144,24 +178,52 @@ jobs:
           gh release view "$RELEASE_TAG" --json body --jq .body > "$RUNNER_TEMP/changelog.md"
           test -s "$RUNNER_TEMP/changelog.md"
 
-      - name: Publish Minecraft ${{ matrix.minecraft_version }} jar to CurseForge
+      - name: Publish Minecraft ${{ matrix.minecraft_version }} (${{ matrix.loader }}) jar to CurseForge
         run: |
           set -euo pipefail
-          display_name="Soul Link $VERSION (Minecraft $MINECRAFT)"
+          loader_label=""
+          dependency_slug=""
+          # Terra Rasa is bundled in the Fabric jar, so it is embedded there; NeoForge jars declare
+          # it as a required dependency instead, because the library is installed as its own mod.
+          terrarasa_dependency_type=""
+          case "$LOADER" in
+            fabric)
+              dependency_slug="$FABRIC_API_SLUG"
+              terrarasa_dependency_type="embeddedLibrary"
+              ;;
+            neoforge)
+              loader_label=" NeoForge"
+              dependency_slug="$NEOFORGE_SLUG"
+              terrarasa_dependency_type="requiredDependency"
+              ;;
+            *)
+              echo "Unsupported loader '$LOADER' for Minecraft $MINECRAFT" >&2
+              exit 1
+              ;;
+          esac
+          display_name="Soul Link $VERSION (Minecraft $MINECRAFT${loader_label})"
 
-          target_game_versions="$(jq -c --arg mc "$MINECRAFT" '.[$mc]' <<< "$GAME_VERSIONS")"
+          # The resolver tags every target with the Fabric loader; a NeoForge file needs its own
+          # loader game version instead, keeping the Minecraft, Java and environment tags.
+          if [[ "$LOADER" == "neoforge" ]]; then
+            target_game_versions="$(jq -c --arg mc "$MINECRAFT" \
+              --argjson fabric "$FABRIC_LOADER_ID" --argjson neoforge "$NEOFORGE_LOADER_ID" \
+              '((.[$mc] // []) - [$fabric]) + [$neoforge] | sort | unique' <<< "$GAME_VERSIONS")"
+          else
+            target_game_versions="$(jq -c --arg mc "$MINECRAFT" '.[$mc]' <<< "$GAME_VERSIONS")"
+          fi
           test -n "$target_game_versions" && test "$target_game_versions" != "null" || {
-            echo "No CurseForge game version IDs resolved for Minecraft $MINECRAFT" >&2
+            echo "No CurseForge game version IDs resolved for Minecraft $MINECRAFT ($LOADER)" >&2
             exit 1
           }
 
           build_metadata() {
-            local include_embedded="$1"
+            local terrarasa_type="$1"
             local relations
-            if [[ "$include_embedded" == "true" && -n "$TERRARASA_SLUG" && "$TERRARASA_SLUG" != "none" && "$TERRARASA_SLUG" != "skip" ]]; then
-              relations='{"projects":[{"slug":"'"$FABRIC_API_SLUG"'","type":"requiredDependency"},{"slug":"'"$TERRARASA_SLUG"'","type":"embeddedLibrary"}]}'
+            if [[ -n "$terrarasa_type" && -n "$TERRARASA_SLUG" && "$TERRARASA_SLUG" != "none" && "$TERRARASA_SLUG" != "skip" ]]; then
+              relations='{"projects":[{"slug":"'"$dependency_slug"'","type":"requiredDependency"},{"slug":"'"$TERRARASA_SLUG"'","type":"'"$terrarasa_type"'"}]}'
             else
-              relations='{"projects":[{"slug":"'"$FABRIC_API_SLUG"'","type":"requiredDependency"}]}'
+              relations='{"projects":[{"slug":"'"$dependency_slug"'","type":"requiredDependency"}]}'
             fi
 
             jq -n --rawfile changelog "$RUNNER_TEMP/changelog.md" \
@@ -172,7 +234,7 @@ jobs:
           }
 
           response_file="$RUNNER_TEMP/curseforge-response.json"
-          build_metadata "true" > "$RUNNER_TEMP/curseforge-metadata.json"
+          build_metadata "$terrarasa_dependency_type" > "$RUNNER_TEMP/curseforge-metadata.json"
 
           if ! http_status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
             -H "X-Api-Token: $CURSEFORGE_TOKEN" \
@@ -185,8 +247,8 @@ jobs:
           fi
 
           if [[ ! "$http_status" =~ ^2[0-9][0-9]$ ]] && grep -iq -E "Invalid slug in project relations|does not exist, is not accessible" "$response_file" 2>/dev/null; then
-            echo "Related project '$TERRARASA_SLUG' is not accessible on CurseForge (e.g. still under review); retrying upload without embedded library relation..."
-            build_metadata "false" > "$RUNNER_TEMP/curseforge-metadata.json"
+            echo "Related project '$TERRARASA_SLUG' is not accessible on CurseForge (e.g. still under review); retrying upload without the Terra Rasa relation..."
+            build_metadata "" > "$RUNNER_TEMP/curseforge-metadata.json"
             if ! http_status="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' \
               -H "X-Api-Token: $CURSEFORGE_TOKEN" \
               -F "metadata=<$RUNNER_TEMP/curseforge-metadata.json" \
@@ -212,4 +274,4 @@ jobs:
             exit 1
           fi
 
-          jq -er 'select(.id) | "Published CurseForge file \(.id) for Minecraft '$MINECRAFT'"' "$response_file"
+          jq -er 'select(.id) | "Published CurseForge file \(.id) for Minecraft '$MINECRAFT' ('"$LOADER"')"' "$response_file"

@@ -1,8 +1,8 @@
 # Soul Link
 
-Cooperative challenge runs for Fabric dedicated servers and integrated single-player/LAN worlds, inspired by the Soul Link format and similar co-op challenges. Shared health, hunger, and saturation are enabled by default and can be disabled for future runs; defeating the Ender Dragon wins.
+Cooperative challenge runs for Fabric and NeoForge dedicated servers and integrated single-player/LAN worlds, inspired by the Soul Link format and similar co-op challenges. Shared health, hunger, and saturation are enabled by default and can be disabled for future runs; defeating the Ender Dragon wins.
 
-Each run uses fresh, seeded Overworld, Nether, and End worlds while players stay connected in a persistent lobby. [Terra Rasa](https://github.com/qwasdf-1/terra-rasa) handles world preparation and replacement and is bundled in Soul Link's mod jar. Its [README](https://github.com/qwasdf-1/terra-rasa#terra-rasa) explains how canonical replacement keeps vanilla's world behavior intact.
+Each run uses fresh, seeded Overworld, Nether, and End worlds while players stay connected in a persistent lobby. [Terra Rasa](https://github.com/qwasdf-1/terra-rasa) handles world preparation and replacement; it is bundled inside Soul Link's Fabric jar and installed as a separate required mod on NeoForge. Its [README](https://github.com/qwasdf-1/terra-rasa#terra-rasa) explains how canonical replacement keeps vanilla's world behavior intact.
 
 ## Features
 
@@ -16,11 +16,31 @@ Each run uses fresh, seeded Overworld, Nether, and End worlds while players stay
 - **Optional shared potions:** when enabled, ongoing effect gains, upgrades, removals, and expirations are mirrored to teammates. Instant healing and damage already flow through shared vitality.
 - **Optional half-heart runs:** limit participants and the shared health pool to one health point, with player max health restored when they return to the lobby.
 - **Operator controls:** pause the run timer without pausing gameplay, toggle vanilla natural regeneration, and configure optional pregeneration.
-- **Server-owned gameplay:** the host needs Soul Link installed for dedicated or integrated servers. LAN guests can connect with vanilla clients.
+- **Server-owned gameplay:** the host needs Soul Link installed for dedicated or integrated servers on either loader. LAN guests can connect with vanilla clients.
 
 ## Requirements and installation
 
-Supported game versions are **1.21.11**, **26.1**, **26.1.1**, **26.1.2**, **26.2**, and **26.3**. Minecraft 1.21.11 builds with Java 21; the 26.x versions build with Java 25. Each target's Fabric Loader, Fabric API, Loom, and Java versions are pinned in [`gradle/minecraft-targets.json`](gradle/minecraft-targets.json). Gradle 9.7.1 is required to build from source.
+Supported game versions are **1.21.11**, **26.1**, **26.1.1**, **26.1.2**, **26.2**, and **26.3**. Minecraft 1.21.11 builds with Java 21; the 26.x versions build with Java 25. Soul Link provides a separate build for each supported game version and loader, and each target's toolchain versions are pinned in [`gradle/minecraft-targets.json`](gradle/minecraft-targets.json). Gradle 9.7.1 is required to build from source.
+
+Fabric builds cover every listed Minecraft version and use Fabric Loader 0.19.5:
+
+| Minecraft | Java | Fabric Loom | Fabric API |
+|---|---:|---:|---|
+| 1.21.11 | 21 | 1.17.21 | 0.141.6+1.21.11 |
+| 26.1 | 25 | 1.18.4 | 0.145.1+26.1 |
+| 26.1.1 | 25 | 1.18.4 | 0.145.4+26.1.1 |
+| 26.1.2 | 25 | 1.18.4 | 0.155.3+26.1.2 |
+| 26.2 | 25 | 1.18.4 | 0.161.0+26.2 |
+| 26.3 | 25 | 1.18.4 | 0.165.0+26.3 |
+
+NeoForge builds exist for the Minecraft versions NeoForge has a stable release for. They use ModDevGradle 2.0.148:
+
+| Minecraft | Java | NeoForge |
+|---|---:|---:|
+| 1.21.11 | 21 | 21.11.48 |
+| 26.1.2 | 25 | 26.1.2.126 |
+| 26.2 | 25 | 26.2.0.93 |
+| 26.3 | 25 | 26.3.0.101 |
 
 Build the mod with a Terra Rasa checkout next to this repository:
 
@@ -33,19 +53,31 @@ cd ../soul-link
 ./gradlew build
 ```
 
-The build uses the matching Terra Rasa artifact from Maven Local. To build a non-default game target, pass the matching Loom, Minecraft, Fabric Loader, Fabric API, and Java values from [`gradle/minecraft-targets.json`](gradle/minecraft-targets.json) to both projects.
+The build uses the matching Terra Rasa artifact from Maven Local. To build a non-default game target, pass the matching Minecraft, Java, and loader values from [`gradle/minecraft-targets.json`](gradle/minecraft-targets.json) to both projects; the default is the 26.2 Fabric build.
 
 For example, to build the library for Minecraft 1.21.11 before building Soul Link:
 
 ```sh
 # Run these commands from the parent directory containing both checkouts.
 cd terra-rasa
-./gradlew publishToMavenLocal -Ploom_version=1.17.21 -Pminecraft_version=1.21.11 -Pfabric_loader_version=0.19.5 -Pfabric_api_version=0.141.6+1.21.11 -Pjava_version=21
+./gradlew publishToMavenLocal -Ploader=fabric -Ploom_version=1.17.21 -Pminecraft_version=1.21.11 -Pfabric_loader_version=0.19.5 -Pfabric_api_version=0.141.6+1.21.11 -Pjava_version=21
 cd ../soul-link
-./gradlew build -Ploom_version=1.17.21 -Pminecraft_version=1.21.11 -Pfabric_loader_version=0.19.5 -Pfabric_api_version=0.141.6+1.21.11 -Pjava_version=21
+./gradlew build -Ploader=fabric -Ploom_version=1.17.21 -Pminecraft_version=1.21.11 -Pfabric_loader_version=0.19.5 -Pfabric_api_version=0.141.6+1.21.11 -Pjava_version=21
 ```
 
-Place the jar matching the game version, named `build/libs/soullink-mc<game-version>-<mod-version>.jar`, and Fabric API in the dedicated server's `mods/` directory or the single-player host's `mods/` directory. For example, use `soullink-mc1.21.11-<mod-version>.jar` on 1.21.11 or `soullink-mc26.2-<mod-version>.jar` on 26.2. Terra Rasa is bundled; the lobby dimension and its platform are included, so no extra datapack or world setup is required.
+For a NeoForge build, pass the loader and the NeoForge toolchain values to both projects; Terra Rasa publishes a separate artifact for that loader:
+
+```sh
+# Run these commands from the parent directory containing both checkouts.
+cd terra-rasa
+./gradlew publishToMavenLocal -Ploader=neoforge -Pmoddev_version=2.0.148 -Pminecraft_version=26.2 -Pneoforge_version=26.2.0.93 -Pjava_version=25
+cd ../soul-link
+./gradlew build -Ploader=neoforge -Pmoddev_version=2.0.148 -Pminecraft_version=26.2 -Pneoforge_version=26.2.0.93 -Pjava_version=25
+```
+
+Place the jar matching the game version and loader in the dedicated server's `mods/` directory or the single-player host's `mods/` directory. The Fabric jar is named `build/libs/soullink-mc<game-version>-<mod-version>.jar`, for example `soullink-mc1.21.11-<mod-version>.jar` on 1.21.11 or `soullink-mc26.2-<mod-version>.jar` on 26.2. The NeoForge jar is the `soullink-mc<game-version>-neoforge-<mod-version>.jar` file, for example `soullink-mc26.2-neoforge-<mod-version>.jar` on 26.2.
+
+Fabric servers also need Fabric API in `mods/`. Terra Rasa is bundled inside the Soul Link jar on Fabric; on NeoForge it is a separate required mod, so install the matching Terra Rasa jar (`terra-rasa-mc<game-version>-neoforge-<mod-version>.jar`) next to it. The lobby dimension and its platform are included, so no extra datapack or world setup is required.
 
 By default, Soul Link replaces the vanilla Overworld, Nether, and End. The lobby and any dimension not listed for replacement remain untouched. Mod or datapack dimensions used by the run can be added in `config/soullink.json`; details are in the [configuration guide](docs/configuration.md).
 
@@ -118,7 +150,7 @@ See the [configuration guide](docs/configuration.md) for valid ranges, custom di
 ./gradlew modpackTest
 ```
 
-The integration suites run the mod on a real dedicated server with headless clients. The modpack suite adds pinned, checksum-verified world-generation and compatibility mods.
+The integration suites run the mod on a real dedicated server with headless clients. The modpack suite adds pinned, checksum-verified world-generation and compatibility mods. Both suites currently install a Fabric server; the NeoForge server install path is in place and the suites still need a NeoForge run.
 
 ## Not included
 
