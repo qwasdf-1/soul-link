@@ -16,7 +16,7 @@ import dev.soullink.lobby.LobbyService;
 import dev.terrarasa.AtomicFiles;
 import dev.terrarasa.DimensionPolicy;
 import dev.terrarasa.Json;
-import net.minecraft.resources.Identifier;
+import dev.terrarasa.ResourceIdentifier;
 
 /** Operator configuration, stored as {@code config/soullink.json}. Missing fields keep their defaults. */
 public final class SoulLinkConfig {
@@ -92,14 +92,14 @@ public final class SoulLinkConfig {
     }
 
     /** Pregeneration radii, keyed by dimension. */
-    public Map<Identifier, Integer> pregenerationRadii() {
-        Map<Identifier, Integer> radii = new LinkedHashMap<>();
-        this.pregeneration.forEach((dimension, radius) -> radii.put(Identifier.parse(dimension), radius));
+    public Map<ResourceIdentifier, Integer> pregenerationRadii() {
+        Map<ResourceIdentifier, Integer> radii = new LinkedHashMap<>();
+        this.pregeneration.forEach((dimension, radius) -> radii.put(ResourceIdentifier.parse(dimension), radius));
         return radii;
     }
 
-    private static List<Identifier> parse(List<String> ids) {
-        return ids.stream().map(Identifier::parse).collect(Collectors.toList());
+    private static List<ResourceIdentifier> parse(List<String> ids) {
+        return ids.stream().map(ResourceIdentifier::parse).collect(Collectors.toList());
     }
 
     public void validate() {

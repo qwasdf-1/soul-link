@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.StringJoiner;
 
+import dev.soullink.MinecraftCompat;
 import net.minecraft.network.protocol.game.ClientboundHurtAnimationPacket;
 import net.minecraft.network.chat.Component;
 import net.minecraft.ChatFormatting;
@@ -96,7 +97,7 @@ public final class SharedVitality {
             for (ServerPlayer player : participants) {
                 Float taken = damageTaken.get(player.getUUID());
                 if (taken != null) {
-                    names.add(player.getGameProfile().name());
+                    names.add(MinecraftCompat.playerName(player));
                     damage += taken;
                 }
             }

@@ -47,7 +47,7 @@ public final class SoulLinkCommands {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher, boolean debugCommands) {
         var prepare = Commands.literal("prepare")
-                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .requires(source -> MinecraftCompat.hasPermission(source, 2))
                 .executes(ctx -> reply(ctx, coordinator -> coordinator.prepare(null, null)))
                 .then(Commands.literal("random")
                         .executes(ctx -> reply(ctx, coordinator -> coordinator.prepare(null, null)))
@@ -61,7 +61,7 @@ public final class SoulLinkCommands {
                                         LongArgumentType.getLong(ctx, "seed"),
                                         IntegerArgumentType.getInteger(ctx, "preloadRadius"))))));
         var rules = Commands.literal("rules")
-                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .requires(source -> MinecraftCompat.hasPermission(source, 2))
                 .then(Commands.literal("sharedVitality")
                         .then(Commands.argument("enabled", BoolArgumentType.bool())
                                 .executes(ctx -> reply(ctx, coordinator -> coordinator.setSharedVitality(
@@ -91,7 +91,7 @@ public final class SoulLinkCommands {
                                 .executes(ctx -> reply(ctx, coordinator -> coordinator.setAutoPrepare(
                                         BoolArgumentType.getBool(ctx, "enabled"))))));
         var setup = Commands.literal("setup")
-                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .requires(source -> MinecraftCompat.hasPermission(source, 2))
                 .executes(SoulLinkCommands::openSetup)
                 .then(Commands.literal("info").executes(ctx -> reply(ctx, RunCoordinator::setupInfo)))
                 .then(Commands.literal("pregen")
@@ -114,23 +114,23 @@ public final class SoulLinkCommands {
                 .then(Commands.literal("info")
                         .executes(ctx -> reply(ctx, coordinator -> Component.literal(coordinator.runInfo()))))
                 .then(Commands.literal("status")
-                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .requires(source -> MinecraftCompat.hasPermission(source, 2))
                         .executes(ctx -> reply(ctx, RunCoordinator::statusInfo)))
                 .then(Commands.literal("stop")
-                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .requires(source -> MinecraftCompat.hasPermission(source, 2))
                         .executes(ctx -> reply(ctx, RunCoordinator::stopRun)))
                 .then(Commands.literal("pause")
-                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .requires(source -> MinecraftCompat.hasPermission(source, 2))
                         .executes(ctx -> reply(ctx, RunCoordinator::pauseTimer)))
                 .then(Commands.literal("resume")
-                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .requires(source -> MinecraftCompat.hasPermission(source, 2))
                         .executes(ctx -> reply(ctx, RunCoordinator::resumeTimer)))
                 .then(setup)
                 .then(prepare)
                 .then(rules);
         if (debugCommands) {
             soullink.then(Commands.literal("debug")
-                    .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                    .requires(source -> MinecraftCompat.hasPermission(source, 2))
                     .then(Commands.literal("lifecycle").executes(ctx -> json(ctx, () -> coordinator().describe())))
                     .then(Commands.literal("fail")
                             .then(Commands.argument("point", StringArgumentType.word())
@@ -271,7 +271,7 @@ public final class SoulLinkCommands {
         bossBar.addProperty("visible", bar.isVisible());
         bossBar.addProperty("progress", bar.getProgress());
         JsonArray viewers = new JsonArray();
-        bar.getPlayers().forEach(player -> viewers.add(player.getGameProfile().name()));
+        bar.getPlayers().forEach(player -> viewers.add(MinecraftCompat.playerName(player)));
         bossBar.add("players", viewers);
         json.add("bossBar", bossBar);
         UUID tracked = accessor.soullink$dragonUuid();
@@ -295,7 +295,7 @@ public final class SoulLinkCommands {
         json.addProperty("experienceOrbValue", experience);
         // Vanilla places the egg on top of the exit portal's pillar after the first kill of a fight.
         BlockPos podium = accessor.soullink$origin();
-        for (int y = end.getMinY(); y < end.getMaxY(); y++) {
+        for (int y = MinecraftCompat.getMinY(end); y < MinecraftCompat.getMaxY(end); y++) {
             if (end.getBlockState(podium.atY(y)).is(Blocks.DRAGON_EGG)) {
                 json.addProperty("dragonEggY", y);
             }
@@ -305,8 +305,8 @@ public final class SoulLinkCommands {
 
     private static JsonObject describePlayer(MinecraftServer server, ServerPlayer player) {
         JsonObject json = new JsonObject();
-        json.addProperty("name", player.getGameProfile().name());
-        json.addProperty("dimension", player.level().dimension().identifier().toString());
+        json.addProperty("name", MinecraftCompat.playerName(player));
+        json.addProperty("dimension", MinecraftCompat.dimensionId(player.level().dimension()).asString());
         json.addProperty("x", player.getX());
         json.addProperty("y", player.getY());
         json.addProperty("z", player.getZ());
@@ -315,7 +315,7 @@ public final class SoulLinkCommands {
         // Drives phantom spawning; part of the statistics a new run resets.
         json.addProperty("timeSinceRest", player.getStats().getValue(Stats.CUSTOM.get(Stats.TIME_SINCE_REST)));
         json.addProperty("saturation", player.getFoodData().getSaturationLevel());
-        json.addProperty("gameMode", player.gameMode().getName());
+        json.addProperty("gameMode", MinecraftCompat.playerGameModeName(player));
         json.addProperty("alive", player.isAlive());
         json.addProperty("xpLevel", player.experienceLevel);
         int items = 0;

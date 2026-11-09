@@ -37,7 +37,7 @@ final class SeedProbe {
 
     static JsonObject probe(MinecraftServer server, ServerLevel level, BlockPos center, boolean far) {
         JsonObject json = new JsonObject();
-        json.addProperty("dimension", level.dimension().identifier().toString());
+        json.addProperty("dimension", MinecraftCompat.dimensionId(level.dimension()).asString());
         json.addProperty("globalSeed", MinecraftCompat.globalSeed(server));
         json.addProperty("levelSeed", level.getSeed());
         json.addProperty("overworldSeed", server.overworld().getSeed());
@@ -67,7 +67,7 @@ final class SeedProbe {
             sample.addProperty("noiseHeight", chunkSource.getGenerator().getBaseHeight(x, z,
                     Heightmap.Types.OCEAN_FLOOR_WG, level, chunkSource.randomState()));
             sample.addProperty("biome", level.getBiome(new BlockPos(x, BIOME_SAMPLE_Y, z)).unwrapKey()
-                    .map(key -> key.identifier().toString()).orElse("?"));
+                    .map(MinecraftCompat::resourceLocationString).orElse("?"));
             // Includes decoration (trees, lakes), which vanilla places order-dependently across chunk borders.
             sample.addProperty("surfaceHeight", level.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z));
             samples.add(sample);
@@ -76,7 +76,7 @@ final class SeedProbe {
     }
 
     private static JsonArray structureStarts(ServerLevel level, BlockPos center) {
-        var structures = level.registryAccess().lookupOrThrow(Registries.STRUCTURE);
+        var structures = MinecraftCompat.lookupOrThrow(level.registryAccess(), Registries.STRUCTURE);
         TreeSet<String> starts = new TreeSet<>();
         ChunkPos origin = MinecraftCompat.chunkPos(center);
         for (int cx = MinecraftCompat.chunkX(origin) - STRUCTURE_SCAN_RADIUS; cx <= MinecraftCompat.chunkX(origin) + STRUCTURE_SCAN_RADIUS; cx++) {
@@ -100,7 +100,7 @@ final class SeedProbe {
         LevelChunk chunk = level.getChunk(MinecraftCompat.chunkX(position), MinecraftCompat.chunkZ(position));
         CRC32 crc = new CRC32();
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-        for (int y = level.getMinY(); y < level.getMaxY(); y++) {
+        for (int y = MinecraftCompat.getMinY(level); y < MinecraftCompat.getMaxY(level); y++) {
             for (int x = 0; x < 16; x++) {
                 for (int z = 0; z < 16; z++) {
                     int id = Block.getId(chunk.getBlockState(cursor.set(position.getMinBlockX() + x, y, position.getMinBlockZ() + z)));

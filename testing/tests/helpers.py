@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
 import time
 from typing import Any
 
@@ -18,6 +19,20 @@ class SoulLinkServer(ServerProcess):
     PLAYER_COMMAND = "soullink debug player {name}"
     #: Pregeneration adds about a minute to every preparation; modules that test it opt in.
     CONFIG_DEFAULTS = {"pregeneration": {}}
+
+    def dimension_dir(self, dimension: str) -> Path:
+        """The directory where a dimension's storage lives (adapts between modern and legacy/classic)."""
+        dim_path = self.world / "dimensions" / dimension.replace(":", "/")
+        if dim_path.exists():
+            return dim_path
+        if dimension == "minecraft:overworld":
+            return self.world
+        if dimension == "minecraft:the_nether":
+            return self.world / "DIM-1"
+        if dimension == "minecraft:the_end":
+            return self.world / "DIM1"
+        namespace, path = dimension.split(":", 1)
+        return self.world / "dimensions" / namespace / path
 
 OVERWORLD = "minecraft:overworld"
 NETHER = "minecraft:the_nether"

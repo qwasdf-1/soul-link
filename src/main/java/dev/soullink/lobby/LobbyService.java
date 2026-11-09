@@ -1,11 +1,9 @@
 package dev.soullink.lobby;
 
+import dev.soullink.MinecraftCompat;
 import dev.soullink.SoulLink;
+import dev.terrarasa.ResourceIdentifier;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Registry;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -14,14 +12,12 @@ import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.portal.TeleportTransition;
-import net.minecraft.world.level.storage.LevelData;
 import net.minecraft.world.phys.Vec3;
 
 /** The persistent {@code soullink:lobby} dimension: a void world with one platform. */
 public final class LobbyService {
-    public static final Identifier DIMENSION = Identifier.fromNamespaceAndPath(SoulLink.MOD_ID, "lobby");
-    public static final ResourceKey<Level> KEY = ResourceKey.create(Registries.DIMENSION, DIMENSION);
+    public static final ResourceIdentifier DIMENSION = ResourceIdentifier.of(SoulLink.MOD_ID, "lobby");
+    public static final ResourceKey<Level> KEY = MinecraftCompat.dimensionKey(DIMENSION);
     /**
      * Non-persistent: the lobby re-adds it at every startup. Registered by
      * {@link SoulLink#registerTicketTypes()} while the built-in registries still accept additions.
@@ -47,7 +43,7 @@ public final class LobbyService {
     /** Keeps the platform chunks loaded and builds the platform once. */
     public static void initialize(MinecraftServer server) {
         ServerLevel lobby = level(server);
-        lobby.getChunkSource().addTicketWithRadius(TICKET, new ChunkPos(0, 0), 1);
+        MinecraftCompat.addRegionTicket(lobby, TICKET, new ChunkPos(0, 0), 1);
         if (lobby.getBlockState(new BlockPos(0, PLATFORM_Y, 0)).isAir()) {
             for (int x = -PLATFORM_RADIUS; x <= PLATFORM_RADIUS; x++) {
                 boolean edgeColumn = Math.abs(x) == PLATFORM_RADIUS;
@@ -82,8 +78,8 @@ public final class LobbyService {
         }
     }
 
-    public static LevelData.RespawnData respawnData(MinecraftServer server) {
-        return LevelData.RespawnData.of(level(server).dimension(), BlockPos.containing(SPAWN), 0.0F, 0.0F);
+    public static BlockPos spawnBlockPos() {
+        return BlockPos.containing(SPAWN);
     }
 
     public static boolean isIn(ServerPlayer player) {
@@ -91,8 +87,6 @@ public final class LobbyService {
     }
 
     public static ServerPlayer teleport(MinecraftServer server, ServerPlayer player) {
-        ServerPlayer moved = player.teleport(new TeleportTransition(level(server), SPAWN, Vec3.ZERO, 0.0F, 0.0F,
-                TeleportTransition.DO_NOTHING));
-        return moved != null ? moved : player;
+        return MinecraftCompat.teleport(player, level(server), SPAWN, 0.0F, 0.0F);
     }
 }

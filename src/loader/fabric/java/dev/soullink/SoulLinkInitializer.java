@@ -13,6 +13,7 @@ import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.MinecraftServer;
@@ -76,12 +77,18 @@ public final class SoulLinkInitializer implements ModInitializer {
 
         @Override
         public void onPlayerJoin(Consumer<ServerPlayer> callback) {
-            ServerPlayerEvents.JOIN.register(callback::accept);
+            ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+                server.execute(() -> {
+                    if (!handler.player.isRemoved()) {
+                        callback.accept(handler.player);
+                    }
+                });
+            });
         }
 
         @Override
         public void onPlayerLeave(Consumer<ServerPlayer> callback) {
-            ServerPlayerEvents.LEAVE.register(callback::accept);
+            ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> callback.accept(handler.player));
         }
 
         @Override

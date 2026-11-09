@@ -106,10 +106,9 @@ def test_old_data_is_cleaned_up_after_commit(server, players):
     from helpers import wait_true
     wait_true(cleaned, 30, "post-commit cleanup")
     for key in RESETTABLE:
-        namespace, path = key.split(":")
         # Promoted data (never-visited dimensions only carry data/, e.g. the dragon fight).
-        assert (server.world / "dimensions" / namespace / path / "data").is_dir()
-    assert any((server.world / "dimensions" / "minecraft" / "overworld" / "region").glob("*.mca"))
+        assert (server.dimension_dir(key) / "data").is_dir()
+    assert any((server.dimension_dir("minecraft:overworld") / "region").glob("*.mca"))
 
 
 def test_repeated_resets_use_fresh_seeds_without_leaking_levels(server, players):

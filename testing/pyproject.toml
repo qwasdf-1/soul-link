@@ -9,8 +9,8 @@ dependencies = ["pytest>=8.3", "terra-rasa-testkit"]
 package = false
 
 [tool.uv.sources]
-# The test kit ships with Terra Rasa; the checkout next to this one, as for the Gradle build.
-terra-rasa-testkit = { path = "../../terra-rasa/testing", editable = true }
+# The test kit ships with Terra Rasa or workspace; workspace takes precedence
+terra-rasa-testkit = { workspace = true }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

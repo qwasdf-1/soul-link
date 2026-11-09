@@ -5,10 +5,10 @@ import java.util.StringJoiner;
 
 import dev.soullink.MinecraftCompat;
 import dev.soullink.run.RunCoordinator;
+import dev.terrarasa.ResourceIdentifier;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.item.Item;
@@ -120,7 +120,7 @@ public final class SetupMenuView {
             int dimensionIndex = pageOffset + row - 1;
             if (row >= 1 && row <= 5 && dimensionIndex >= 0
                     && dimensionIndex < settings.resettableDimensions().size()) {
-                Identifier dimension = settings.resettableDimensions().get(dimensionIndex);
+                ResourceIdentifier dimension = settings.resettableDimensions().get(dimensionIndex);
                 String name = dimension.toString();
                 int radius = settings.pregeneration().getOrDefault(name, 0);
                 int updated = switch (column) {
@@ -211,7 +211,7 @@ public final class SetupMenuView {
             if (dimensionIndex >= settings.resettableDimensions().size()) {
                 break;
             }
-            Identifier dimension = settings.resettableDimensions().get(dimensionIndex);
+            ResourceIdentifier dimension = settings.resettableDimensions().get(dimensionIndex);
             String id = dimension.toString();
             int radius = settings.pregeneration().getOrDefault(id, 0);
             int base = row * 9;
@@ -270,7 +270,7 @@ public final class SetupMenuView {
         return Component.literal(title + ": " + (values.isEmpty() ? "none" : joiner));
     }
 
-    private static int normalizePregenOffset(List<Identifier> dimensions, int requestedOffset) {
+    private static int normalizePregenOffset(List<ResourceIdentifier> dimensions, int requestedOffset) {
         int maxOffset = Math.max(0, ((dimensions.size() - 1) / PREGEN_DIMENSIONS_PER_PAGE) * PREGEN_DIMENSIONS_PER_PAGE);
         int clamped = Math.max(0, Math.min(maxOffset, requestedOffset));
         return (clamped / PREGEN_DIMENSIONS_PER_PAGE) * PREGEN_DIMENSIONS_PER_PAGE;

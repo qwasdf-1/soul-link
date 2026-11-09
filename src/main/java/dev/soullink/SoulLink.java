@@ -2,11 +2,6 @@ package dev.soullink;
 
 import java.nio.file.Path;
 
-import net.minecraft.core.Registry;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
-import net.minecraft.server.level.TicketType;
-
 import dev.soullink.lobby.LobbyService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,8 +24,7 @@ public final class SoulLink {
      * because its registries are frozen by the time a {@code @Mod} constructor runs.
      */
     public static void registerTicketTypes() {
-        LobbyService.TICKET = Registry.register(BuiltInRegistries.TICKET_TYPE,
-                Identifier.fromNamespaceAndPath(MOD_ID, "lobby"), new TicketType(0L, TicketType.FLAG_LOADING));
+        MinecraftCompat.registerTicketTypes();
     }
 
     private SoulLink() {

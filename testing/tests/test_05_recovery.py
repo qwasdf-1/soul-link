@@ -30,7 +30,7 @@ def journal(server) -> dict:
 
 
 def canonical_dirs_present(server) -> bool:
-    return all((server.world / "dimensions" / "minecraft" / name / "data").is_dir()
+    return all((server.dimension_dir(f"minecraft:{name}") / "data").is_dir()
                for name in ("overworld", "the_nether", "the_end"))
 
 

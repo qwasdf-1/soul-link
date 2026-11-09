@@ -30,7 +30,7 @@ def players(server):
 
 
 def overworld(server) -> Path:
-    return server.world / "dimensions" / "minecraft" / "overworld"
+    return server.dimension_dir("minecraft:overworld")
 
 
 def marker_positions(spawn: list[int]) -> list[tuple[int, int, int]]:
@@ -79,7 +79,7 @@ def meeting_pois(root: Path) -> set[tuple[int, int, int]]:
 def assert_intact(server, dimensions=("overworld", "the_nether", "the_end")) -> dict[str, int]:
     chunks = {}
     for name in dimensions:
-        report = verify_dimension(server.world / "dimensions" / "minecraft" / name)
+        report = verify_dimension(server.dimension_dir(f"minecraft:{name}"))
         assert not report.problems, f"{name}: {report.problems[:5]}"
         chunks[name] = report.chunks
     return chunks

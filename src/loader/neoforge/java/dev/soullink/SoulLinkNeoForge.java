@@ -43,12 +43,20 @@ public final class SoulLinkNeoForge {
     public SoulLinkNeoForge(IEventBus modEventBus) {
         // The built-in registries are already frozen when a mod constructor runs, so the lobby
         // ticket type registers on the mod bus's registry event instead: that fires while vanilla
-        // still accepts additions to them.
-        modEventBus.addListener(RegisterEvent.class, event -> {
-            if (event.getRegistryKey() == Registries.TICKET_TYPE) {
-                SoulLink.registerTicketTypes();
-            }
-        });
+        // still accepts additions to them. In 1.21.1 and 1.21.4, TICKET_TYPE was not a registry.
+        try {
+            java.lang.reflect.Field field = Registries.class.getField("TICKET_TYPE");
+            Object ticketTypeKey = field.get(null);
+            modEventBus.addListener(RegisterEvent.class, event -> {
+                if (event.getRegistryKey() == ticketTypeKey) {
+                    SoulLink.registerTicketTypes();
+                }
+            });
+        } catch (NoSuchFieldException e) {
+            SoulLink.registerTicketTypes();
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Could not read Registries.TICKET_TYPE", e);
+        }
         SoulLinkRuntime.register(new NeoForgePlatform());
     }
 

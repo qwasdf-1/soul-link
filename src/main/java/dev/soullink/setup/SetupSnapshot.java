@@ -3,7 +3,7 @@ package dev.soullink.setup;
 import java.util.List;
 import java.util.Map;
 
-import net.minecraft.resources.Identifier;
+import dev.terrarasa.ResourceIdentifier;
 
 /** Immutable view of the settings displayed by the operator setup menu. */
 public record SetupSnapshot(
@@ -16,7 +16,7 @@ public record SetupSnapshot(
         boolean autoPrepare,
         int preparedRunPoolSize,
         int readyRunCount,
-        List<Identifier> resettableDimensions,
+        List<ResourceIdentifier> resettableDimensions,
         Map<String, Integer> pregeneration,
         Map<String, Integer> defaultPregeneration,
         List<String> persistentDimensions,

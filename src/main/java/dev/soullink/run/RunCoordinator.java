@@ -36,14 +36,11 @@ import dev.terrarasa.WorldPreparationService;
 import dev.terrarasa.session.SessionReset;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
-import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -56,10 +53,9 @@ import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.RandomSupport;
-import net.minecraft.world.level.portal.TeleportTransition;
-import net.minecraft.world.level.storage.LevelData;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.phys.Vec3;
+import dev.terrarasa.ResourceIdentifier;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -104,7 +100,7 @@ public final class RunCoordinator {
     private @Nullable String lastActivationError;
     private @Nullable String lastReportedPreparationFailure;
     /** Vanilla's own world spawn as found at startup, before Soul Link points it at the lobby. */
-    private LevelData.@Nullable RespawnData startupSpawn;
+    private MinecraftCompat.@Nullable WorldSpawn startupSpawn;
 
     public RunCoordinator(MinecraftServer server, SoulLinkConfig config) {
         this.server = server;
@@ -140,13 +136,13 @@ public final class RunCoordinator {
         reconcileWithJournal();
         syncParticipantIds();
         LobbyService.initialize(this.server);
-        this.startupSpawn = this.server.getWorldData().overworldData().getRespawnData();
+        this.startupSpawn = MinecraftCompat.getInitialSpawn(this.server);
         this.preparation.loadFromDisk(this.server, this.policy);
         if (this.state.status == SoulLinkState.Status.RUNNING || this.state.status == SoulLinkState.Status.ENDED) {
-            this.server.setRespawnData(runRespawnData());
+            MinecraftCompat.setServerRespawn(this.server, Level.OVERWORLD, runSpawn(), 0.0F);
             this.vitality.restore(this.state.sharedHealth, this.state.sharedFood, this.state.sharedSaturation);
         } else {
-            this.server.setRespawnData(LobbyService.respawnData(this.server));
+            MinecraftCompat.setServerRespawn(this.server, LobbyService.KEY, LobbyService.spawnBlockPos(), 0.0F);
         }
         // On a fresh server, preparation doubles as the initial start request. tickStarting() enters the
         // first run as soon as its spawn is ready; subsequent runs still wait for /soullink start.
@@ -280,7 +276,7 @@ public final class RunCoordinator {
             if (this.vitality.tick(participants)) {
                 endRun(SoulLinkState.Result.DEFEAT, "the shared soul ran out of health");
                 for (ServerPlayer player : participants) {
-                    player.kill(player.level());
+                    MinecraftCompat.kill(player);
                 }
                 return;
             }
@@ -525,7 +521,7 @@ public final class RunCoordinator {
     private void enterRun() {
         String runId = this.state.activeRunId;
         BlockPos spawn = runSpawn();
-        this.server.setRespawnData(runRespawnData());
+        MinecraftCompat.setServerRespawn(this.server, Level.OVERWORLD, runSpawn(), 0.0F);
         this.vitality.reset(this.config.halfHeart ? 1.0F : 20.0F);
         this.state.sharedVitality = this.config.sharedVitality;
         this.state.soulLinkHardcore = this.config.soulLinkHardcore;
@@ -542,8 +538,7 @@ public final class RunCoordinator {
             if (this.state.halfHeart) {
                 rememberMaxHealthBase(player);
             }
-            player.teleport(new TeleportTransition(overworld, spawnPointFor(player, overworld, spawn), Vec3.ZERO, 0.0F, 0.0F,
-                    TeleportTransition.DO_NOTHING));
+            MinecraftCompat.teleport(player, overworld, spawnPointFor(player, overworld, spawn), 0.0F, 0.0F);
             this.state.participants.add(player.getUUID().toString());
             this.state.playerRuns.put(player.getUUID().toString(), runId);
         }
@@ -600,14 +595,14 @@ public final class RunCoordinator {
         title(Component.literal(victory ? "Victory!" : "Run failed").withStyle(victory ? ChatFormatting.GOLD : ChatFormatting.RED),
                 Component.literal(time));
         MutableComponent next = Component.literal("[Start next run]").withStyle(Style.EMPTY.withColor(ChatFormatting.GREEN)
-                .withClickEvent(new ClickEvent.RunCommand("/soullink start"))
-                .withHoverEvent(new HoverEvent.ShowText(Component.literal("Generate a fresh world and start"))));
+                .withClickEvent(MinecraftCompat.runCommandClickEvent("/soullink start"))
+                .withHoverEvent(MinecraftCompat.showTextHoverEvent(Component.literal("Generate a fresh world and start"))));
         broadcast(Component.literal((victory ? "The dragon is dead! " : "Run over: " + reason + ". ") + "Time: " + time + " ")
                 .append(next));
     }
 
     private void moveEveryoneToLobby() {
-        this.server.setRespawnData(LobbyService.respawnData(this.server));
+        MinecraftCompat.setServerRespawn(this.server, LobbyService.KEY, LobbyService.spawnBlockPos(), 0.0F);
         for (ServerPlayer player : List.copyOf(this.server.getPlayerList().getPlayers())) {
             sendToLobby(player);
         }
@@ -646,10 +641,9 @@ public final class RunCoordinator {
                     } else if (!isRunLevel(player.level())) {
                         // Saved player data older than the run (a crash right after it started).
                         SoulLink.LOGGER.warn("{} rejoined outside the run; returning them to the run spawn",
-                                player.getGameProfile().name());
+                                MinecraftCompat.playerName(player));
                         ServerLevel overworld = this.server.overworld();
-                        player.teleport(new TeleportTransition(overworld, spawnPointFor(player, overworld, runSpawn()),
-                                Vec3.ZERO, 0.0F, 0.0F, TeleportTransition.DO_NOTHING));
+                        MinecraftCompat.teleport(player, overworld, spawnPointFor(player, overworld, runSpawn()), 0.0F, 0.0F);
                         player.setGameMode(GameType.SURVIVAL);
                     }
                     applyHalfHeart(player);
@@ -661,8 +655,7 @@ public final class RunCoordinator {
                         applyHalfHeart(player);
                     }
                     ServerLevel overworld = this.server.overworld();
-                    player.teleport(new TeleportTransition(overworld, spawnPointFor(player, overworld, runSpawn()),
-                            Vec3.ZERO, 0.0F, 0.0F, TeleportTransition.DO_NOTHING));
+                    MinecraftCompat.teleport(player, overworld, spawnPointFor(player, overworld, runSpawn()), 0.0F, 0.0F);
                     if (this.state.sharedPotions) {
                         activeParticipants().stream().findFirst().ifPresent(teammate -> this.effects.syncJoiner(player, teammate));
                     }
@@ -721,7 +714,7 @@ public final class RunCoordinator {
             DeathRules.Outcome outcome = DeathRules.afterDeath(this.state.sharedVitality,
                     this.state.soulLinkHardcore, vanillaHardcore,
                     this.state.participants, this.state.eliminatedParticipants);
-            String name = player.getGameProfile().name();
+            String name = MinecraftCompat.playerName(player);
             if (outcome == DeathRules.Outcome.END_RUN || outcome == DeathRules.Outcome.TEAM_WIPE) {
                 // Every death is its own line in the log, and the run-level failure is announced
                 // below it: shared vitality ends a run on the first death because the pool is one,
@@ -886,7 +879,7 @@ public final class RunCoordinator {
 
     public Component setupInfo() {
         StringBuilder info = new StringBuilder("Soul Link setup\nOptional pregeneration radii (blocks):");
-        for (Identifier dimension : this.policy.resettable()) {
+        for (ResourceIdentifier dimension : this.policy.resettable()) {
             int radius = this.config.pregeneration.getOrDefault(dimension.toString(), 0);
             info.append("\n  ").append(dimension).append(": ").append(radius == 0 ? "off" : radius);
         }
@@ -984,9 +977,9 @@ public final class RunCoordinator {
     }
 
     public Component setPregenerationRadius(String dimensionName, int radiusBlocks) {
-        Identifier dimension;
+        ResourceIdentifier dimension;
         try {
-            dimension = Identifier.parse(dimensionName);
+            dimension = ResourceIdentifier.parse(dimensionName);
         } catch (RuntimeException e) {
             return Component.literal("Invalid dimension id: " + dimensionName).withStyle(ChatFormatting.RED);
         }
@@ -1082,17 +1075,12 @@ public final class RunCoordinator {
         player.setGameMode(GameType.SPECTATOR);
         if (!isRunLevel(player.level())) {
             ServerLevel overworld = this.server.overworld();
-            player.teleport(new TeleportTransition(overworld, spawnPointFor(player, overworld, runSpawn()), Vec3.ZERO,
-                    0.0F, 0.0F, TeleportTransition.DO_NOTHING));
+            MinecraftCompat.teleport(player, overworld, spawnPointFor(player, overworld, runSpawn()), 0.0F, 0.0F);
         }
     }
 
     private BlockPos runSpawn() {
         return new BlockPos(this.state.spawnX, this.state.spawnY, this.state.spawnZ);
-    }
-
-    private LevelData.RespawnData runRespawnData() {
-        return LevelData.RespawnData.of(Level.OVERWORLD, runSpawn(), 0.0F, 0.0F);
     }
 
     private void broadcast(Component message) {
@@ -1226,7 +1214,7 @@ public final class RunCoordinator {
         json.add("spawn", spawn);
         if (this.startupSpawn != null) {
             JsonObject startup = new JsonObject();
-            startup.addProperty("dimension", this.startupSpawn.dimension().identifier().toString());
+            startup.addProperty("dimension", MinecraftCompat.dimensionId(this.startupSpawn.dimension()).asString());
             startup.addProperty("x", this.startupSpawn.pos().getX());
             startup.addProperty("y", this.startupSpawn.pos().getY());
             startup.addProperty("z", this.startupSpawn.pos().getZ());

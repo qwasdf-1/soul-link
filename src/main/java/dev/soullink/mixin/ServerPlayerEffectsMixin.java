@@ -1,12 +1,14 @@
 package dev.soullink.mixin;
 
 import java.util.Collection;
+import java.util.List;
 
 import dev.soullink.run.RunCoordinator;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.Entity;
 import org.jspecify.annotations.Nullable;
+import org.spongepowered.asm.mixin.Dynamic;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -33,11 +35,21 @@ abstract class ServerPlayerEffectsMixin {
         }
     }
 
-    @Inject(method = "onEffectsRemoved", at = @At("TAIL"))
+    @Dynamic
+    @Inject(method = "onEffectsRemoved", at = @At("TAIL"), require = 0)
     private void soullink$onEffectsRemoved(Collection<MobEffectInstance> effects, CallbackInfo ci) {
         RunCoordinator coordinator = RunCoordinator.active();
         if (coordinator != null) {
             coordinator.onEffectsRemoved((ServerPlayer) (Object) this, effects);
+        }
+    }
+
+    @Dynamic
+    @Inject(method = "onEffectRemoved", at = @At("TAIL"), require = 0)
+    private void soullink$onEffectRemoved(MobEffectInstance effect, CallbackInfo ci) {
+        RunCoordinator coordinator = RunCoordinator.active();
+        if (coordinator != null) {
+            coordinator.onEffectsRemoved((ServerPlayer) (Object) this, List.of(effect));
         }
     }
 }
