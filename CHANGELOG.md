@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.6.0
+
+### Added
+
+- Backport support for Minecraft 1.21.1 and 1.21.4 on both Fabric and NeoForge, compiling against Terra Rasa 0.5.0.
+- Add `classic` overlay tier for 1.21.1 and 1.21.4 including classic menu containers and dragon fight accessors.
+- Defer Fabric player join lobby transitions via `server.execute` to ensure clean initial player placement before lobby teleportation.
+
 ## 0.5.1
 
 ### Changed
