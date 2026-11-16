@@ -6,8 +6,16 @@ a git ref and runs this; the manual "Lab" workflow does the same in CI.
 
 Every boot is a fresh server with two linked players and a run in progress, measured in two phases:
 
-* idle: the game-loop thread's CPU per tick over ``IDLE_SECONDS`` once preparation has settled;
+* idle: the game-loop thread's CPU per tick over ``IDLE_SECONDS`` once preparation has settled, and
+  Soul Link's own self-timed cost per tick (``tickCost``, its rolling window of the last 1200 ticks
+  without a preparation, read straight after the idle window). The self-timed cost is far less noisy
+  but sees only the work Soul Link times, not cost it adds to vanilla code paths;
 * preparation: the thread's CPU over one whole ``soullink prepare`` of a fixed seed and radius.
+
+Both arms run from their own copy of the install's mods folder, differing only in the Soul Link jar.
+The lab configuration (``mc_lab.profile``) comes from the environment and is part of the design:
+``MC_LAB_WORLD`` (``real`` by default, or ``isolated``: no mob spawning, time and weather frozen),
+``MC_LAB_GAMERULES`` for single variables, and ``MC_LAB_CPUS`` / ``MC_LAB_HEAP`` to constrain the server.
 
 Boots run in ABBA/BAAB blocks and adjacent boots pair, so slow drift on the host cancels within a pair.
 Each session first runs ``WARMUP_BOOTS`` unmeasured boots of the next arm: the first boot on a cold host
@@ -33,6 +41,7 @@ from helpers import SoulLinkServer, start_run
 from mc_lab.arms import describe_jar, mods_variant
 from mc_lab.design import abba_blocks, adjacent_pairs, boot_sequence
 from mc_lab.host import is_noisy, load_average_1m, snapshot_host
+from mc_lab.profile import LabConfig, allowed_cpus, apply_gamerules, parse_cpus
 from mc_lab.stats import paired_percent_changes, summarize_paired_changes
 from mc_lab.ticks import parse_tick_query
 
@@ -48,7 +57,7 @@ LEVEL_SEED = 4242
 SOULLINK_CONFIG = {"preloadRadius": PRELOAD_RADIUS}
 JAR_GLOB = "soullink-*.jar"
 TICKS_PER_SECOND = 20
-METRICS = ("idle_cpu_ms_per_tick", "preparation_cpu_seconds")
+METRICS = ("idle_cpu_ms_per_tick", "soul_link_idle_micros_per_tick", "preparation_cpu_seconds")
 WARMUP_BOOTS = 1
 
 
@@ -82,6 +91,8 @@ def measure_boot(server: SoulLinkServer, server_thread) -> dict:
     load_after = load_average_1m()
     return {
         "idle_cpu_ms_per_tick": cpu_ms_per_tick(idle),
+        # A build without tickCost reports nothing; the summary then marks the metric unavailable.
+        "soul_link_idle_micros_per_tick": idle_cost.get("meanMicros") if idle_cost else None,
         "preparation_cpu_seconds": preparation.result["cpu_ns"] / 1e9,
         "quality_pass": idle["quality_pass"] and preparation.result["quality_pass"],
         "noisy": is_noisy(max(load_before, load_after)),
@@ -98,6 +109,9 @@ def summarize(boots: list[dict]) -> dict:
     pairs = [{boots[i]["arm"]: boots[i], boots[i + 1]["arm"]: boots[i + 1]} for i in range(0, len(boots) - 1, 2)]
     summary = {}
     for metric in METRICS:
+        if any(boot.get(metric) is None for boot in boots):
+            summary[metric] = {"unavailable": "not every boot reported it"}
+            continue
         changes = paired_percent_changes(pairs, metric=metric, baseline_arm=BASELINE, candidate_arm=CANDIDATE)
         summary[metric] = {"changes_percent": changes, **summarize_paired_changes(changes)}
     summary["windows_failing_quality"] = sum(not boot["quality_pass"] for boot in boots)
@@ -112,15 +126,17 @@ def test_build_comparison(env, lab_host, server_thread):
     baseline_jar = Path(os.environ["MC_LAB_BASELINE_JAR"]).resolve()
     candidates = sorted((install / "mods").glob(JAR_GLOB))
     assert len(candidates) == 1, f"expected one {JAR_GLOB} in {install / 'mods'}, found {candidates}"
-    baseline_mods = mods_variant(install / "mods", install / "lab" / "baseline-mods", replace=JAR_GLOB,
-                                 jar=baseline_jar)
+    # Each arm runs from its own copy, so the arms differ only in the jar.
+    arm_mods = {arm: mods_variant(install / "mods", install / "lab" / f"{arm}-mods", replace=JAR_GLOB, jar=jar)
+                for arm, jar in ((BASELINE, baseline_jar), (CANDIDATE, candidates[0]))}
+    config = LabConfig.from_env()
     sequence = boot_sequence(abba_blocks(BASELINE, CANDIDATE, BLOCKS))
     adjacent_pairs(sequence)  # validates the design before any boot
     design = {
         "blocks": BLOCKS, "sequence": list(sequence), "idle_seconds": IDLE_SECONDS,
         "preload_radius": PRELOAD_RADIUS, "prepare_seed": PREPARE_SEED, "level_seed": LEVEL_SEED,
         "loader": os.environ.get("MC_TEST_LOADER", "fabric"), "metrics": list(METRICS),
-        "warmup_boots_per_session": WARMUP_BOOTS,
+        "warmup_boots_per_session": WARMUP_BOOTS, "lab_config": config.as_dict(),
         "arms": {BASELINE: describe_jar(baseline_jar), CANDIDATE: describe_jar(candidates[0])},
     }
     refs = {BASELINE: os.environ.get("MC_LAB_BASELINE_REF"), CANDIDATE: os.environ.get("MC_LAB_CANDIDATE_REF")}
@@ -144,15 +160,19 @@ def test_build_comparison(env, lab_host, server_thread):
 
     def boot(session: str, arm: str) -> dict:
         server = SoulLinkServer(install, session, java, packets, SOULLINK_CONFIG, LEVEL_SEED,
-                                mods=baseline_mods if arm == BASELINE else None)
+                                mods=arm_mods[arm], **config.server_options())
         server.start()
         try:
+            pinned = allowed_cpus(server.pid)
+            if config.limits.cpus is not None:
+                assert pinned and parse_cpus(pinned) == config.limits.cpus, f"{session} runs on CPUs {pinned}"
+            applied = apply_gamerules(server.rcon, config.gamerules)
             result = measure_boot(server, server_thread)
         finally:
             server.stop()
         problems = server.suspicious_lines()
         assert not problems, f"{session} logged errors:\n" + "\n".join(problems)
-        return result
+        return {"allowed_cpus": pinned, "gamerules_applied": applied, **result}
 
     if len(boots) < len(sequence):
         for number in range(WARMUP_BOOTS):
@@ -175,8 +195,12 @@ def test_build_comparison(env, lab_host, server_thread):
     summary = summarize(boots)
     write(summary)
     print(f"report: {report_path}" + (" (A/A: both arms ran the same jar)" if same_jar else ""))
+    print("lab configuration:", config.as_dict())
     for metric in METRICS:
         row = summary[metric]
+        if "unavailable" in row:
+            print(f"{metric}: unavailable ({row['unavailable']})")
+            continue
         print(f"{metric}: median {row['median_percent']:+.2f}% "
               f"[{row['ci_low_percent']:+.2f}%, {row['ci_high_percent']:+.2f}%] at "
               f"{row['confidence_achieved']:.1%} over {row['n']} pairs -> {row['no_regression_decision']}")

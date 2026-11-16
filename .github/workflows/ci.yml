@@ -202,7 +202,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: qwasdf-1/mc-tooling
-          ref: 6426a25dc3fbebf1d93eb577aa2194e51b8d954e
+          ref: 1bc396efdf8be316c7ceb10b35bfce7a681fa8ac
           path: mc-tooling
           persist-credentials: false
           # Cross-repository private access requires a read-only token.

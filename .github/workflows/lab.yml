@@ -21,10 +21,27 @@ on:
         description: ABBA blocks (4 boots and 2 pairs each; 3 is the fewest that reach 95% coverage)
         default: '3'
         required: true
+      world:
+        description: World profile (real changes nothing; isolated turns off mob spawning, freezes time and weather)
+        type: choice
+        options: [real, isolated]
+        default: real
+      gamerules:
+        description: Extra game rules, name=value comma-separated (registry names, e.g. random_tick_speed=0)
+        default: ''
+        required: false
+      cpus:
+        description: Pin the server to this many CPUs, or a list such as 0-1 (empty for no limit)
+        default: ''
+        required: false
+      heap:
+        description: Fixed server heap such as 2G (empty for the test kit's default)
+        default: ''
+        required: false
 
 jobs:
   compare:
-    name: lab (${{ inputs.minecraft_version }} fabric, against ${{ inputs.baseline_ref }})
+    name: lab (${{ inputs.minecraft_version }} fabric, ${{ inputs.world }} world, against ${{ inputs.baseline_ref }})
     runs-on: ubuntu-latest
     timeout-minutes: 180
     defaults:
@@ -90,7 +107,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: qwasdf-1/mc-tooling
-          ref: 6426a25dc3fbebf1d93eb577aa2194e51b8d954e
+          ref: 1bc396efdf8be316c7ceb10b35bfce7a681fa8ac
           path: mc-tooling
           persist-credentials: false
           token: ${{ secrets.MC_TOOLING_READ_TOKEN }}
@@ -122,6 +139,10 @@ jobs:
         env:
           MC_TEST_PROTOCOL_VERSION: ${{ steps.target.outputs.protocol_version }}
           MC_LAB_BLOCKS: ${{ inputs.blocks }}
+          MC_LAB_WORLD: ${{ inputs.world }}
+          MC_LAB_GAMERULES: ${{ inputs.gamerules }}
+          MC_LAB_CPUS: ${{ inputs.cpus }}
+          MC_LAB_HEAP: ${{ inputs.heap }}
           TERRA_RASA_PATH: ../terra-rasa
         run: >-
           scripts/lab-compare.sh ${{ steps.target.outputs.baseline_sha }}
@@ -150,6 +171,7 @@ jobs:
           print(f"mc-lab {report['lab']}, {len(report['boots'])} of {len(report['design']['sequence'])} boots "
                 f"(plus {len(report.get('warmups', []))} unpaired warm-ups), "
                 f"host load {report['host'].get('load_1m')} at the start.\n")
+          print(f"Lab configuration: `{json.dumps(report['design'].get('lab_config'))}`\n")
           if report.get("same_jar"):
               print("Both arms ran the same jar: this is an A/A calibration of the runner.\n")
           if not summary:
@@ -159,6 +181,9 @@ jobs:
           print("| --- | --- | --- | --- | --- | --- |")
           for metric in report["design"]["metrics"]:
               row = summary[metric]
+              if "unavailable" in row:
+                  print(f"| {metric} | unavailable: {row['unavailable']} | | | | |")
+                  continue
               print(f"| {metric} | {row['median_percent']:+.2f}% | [{row['ci_low_percent']:+.2f}%, "
                     f"{row['ci_high_percent']:+.2f}%] | {row['confidence_achieved']:.1%} | {row['n']} | "
                     f"{row['no_regression_decision']} |")

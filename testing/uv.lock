@@ -22,7 +22,7 @@ wheels = [
 
 [[package]]
 name = "mc-lab"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "../../mc-tooling/mc-lab" }
 dependencies = [
     { name = "mc-testkit" },
