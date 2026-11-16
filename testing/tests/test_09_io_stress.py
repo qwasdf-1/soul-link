@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from helpers import LOBBY, start_run, wait_true
-from terra_rasa_testkit.anvil import entities_with_tag, read_chunks, verify_dimension
+from mc_testkit.anvil import entities_with_tag, read_chunks, verify_dimension
 
 ALLOWED_LOG = ("Injected failure", "Canonical activation failed")
 MARKER_TAG = "t09"

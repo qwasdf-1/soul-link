@@ -4,7 +4,7 @@ Thanks for helping improve Soul Link. The world swapping lives in [Terra Rasa](h
 
 ## Build And Test
 
-You need Java 21 for Minecraft 1.21.11 and Java 25 for the 26.x targets, plus a Terra Rasa checkout next to this repository at `../terra-rasa`. Build and publish the matching Terra Rasa target to Maven Local before building Soul Link. The integration suites also need [uv](https://docs.astral.sh/uv/), which installs Python 3.14 for them. Target toolchains are listed in [`gradle/minecraft-targets.json`](gradle/minecraft-targets.json).
+You need Java 21 for Minecraft 1.21.11 and Java 25 for the 26.x targets, plus a Terra Rasa checkout next to this repository at `../terra-rasa`. Build and publish the matching Terra Rasa target to Maven Local before building Soul Link. The integration suites also need [uv](https://docs.astral.sh/uv/), which installs Python 3.14 for them, and the shared `mc-testkit` package from the maintainers' private `mc-tooling` repository, checked out at `../mc-tooling`. Until that repository is public, only maintainers can run the suites. Target toolchains are listed in [`gradle/minecraft-targets.json`](gradle/minecraft-targets.json).
 
 ```sh
 cd ../terra-rasa && ./gradlew publishToMavenLocal

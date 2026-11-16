@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from helpers import SoulLinkServer
-from terra_rasa_testkit.server import environment
+from mc_testkit.server import environment
 
 # Small preloads keep preparation fast; tests that measure preloading opt into larger radii.
 DEFAULT_CONFIG = {"preloadRadius": 2}

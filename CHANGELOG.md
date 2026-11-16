@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- The integration suites now import the shared `mc-testkit` from the private `mc-tooling` repository, checked out at `../mc-tooling`, instead of Terra Rasa's bundled test kit. This also restores their dependency resolution in CI, which has failed since 0.6.0.
+
 ## 0.6.0
 
 ### Added

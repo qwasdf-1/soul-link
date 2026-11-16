@@ -152,7 +152,7 @@ See the [configuration guide](docs/configuration.md) for valid ranges, custom di
 ./gradlew modpackTest
 ```
 
-The integration suites run the mod on a real dedicated server with headless clients. The modpack suite adds pinned, checksum-verified world-generation and compatibility mods. Both suites currently install a Fabric server; the NeoForge server install path is in place and the suites still need a NeoForge run.
+The integration suites run the mod on a real dedicated server with headless clients. The modpack suite adds pinned, checksum-verified world-generation and compatibility mods. Both suites currently install a Fabric server; the NeoForge server install path is in place and the suites still need a NeoForge run. Their Python server test kit (`mc-testkit`) comes from the maintainers' private `mc-tooling` repository, checked out next to this one at `../mc-tooling`, so the suites currently run only for maintainers.
 
 ## Not included
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import struct
 import threading
 
-from terra_rasa_testkit.protocol import Reader, Writer, component_text
+from mc_testkit.protocol import Reader, Writer, component_text
 
 
 def test_operator_setup_menu_opens_and_changes_settings(server):
