@@ -19,7 +19,7 @@ from mc_testkit.anvil import entities_with_tag, read_chunks, verify_dimension
 
 ALLOWED_LOG = ("Injected failure", "Canonical activation failed")
 MARKER_TAG = "t09"
-#: Marker chunks around the spawn, offset in chunks; preloadRadius 2 keeps them loaded.
+#: Marker chunks around the spawn, offset in chunks; the forceloaded areas keep them loaded.
 MARKER_OFFSETS = [(dx, dz) for dx in (-2, -1, 1, 2) for dz in (-2, -1, 1, 2)]
 MARKER_Y = 250
 
@@ -46,9 +46,13 @@ def load_up(server, spawn: list[int]) -> None:
         overworld_command(server, f"summon minecraft:armor_stand {x + 0.5} {y + 2} {z + 0.5} "
                                   f"{{NoGravity:1b,Tags:[\"{MARKER_TAG}\"]}}")
     sx, sz = spawn[0], spawn[2]
-    # Four 16x16-chunk areas, vanilla's per-command maximum: 1024 chunks queued at once.
-    for x0, z0 in ((sx - 256, sz - 256), (sx, sz - 256), (sx - 256, sz), (sx, sz)):
-        overworld_command(server, f"forceload add {x0} {z0} {x0 + 255} {z0 + 255}")
+    # Four 16x16-chunk areas, vanilla's per-command maximum: 1024 chunks queued at once. Each area is
+    # aligned to the chunk grid: an unaligned 256-block span covers 17 chunks, and vanilla rejects it.
+    cx, cz = sx >> 4, sz >> 4
+    for ox, oz in ((-16, -16), (0, -16), (-16, 0), (0, 0)):
+        x0, z0 = (cx + ox) * 16, (cz + oz) * 16
+        output = overworld_command(server, f"forceload add {x0} {z0} {x0 + 255} {z0 + 255}")
+        assert "to be force loaded" in output, output
     # A spectator still generates the terrain around them, and cannot die of the fall.
     server.rcon("gamemode spectator Bob")
     server.rcon(f"tp Bob {sx + 3000} 200 {sz + 3000}")
