@@ -17,9 +17,8 @@ scripts/lab-compare.sh main  # paired performance cost of this checkout against 
 
 `scripts/lab-compare.sh <ref> [gradle args...]` builds the baseline ref in a temporary worktree and runs
 the opt-in `lab` measurement (`testing/tests/test_90_lab_build_comparison.py`): one unpaired warm-up
-boot, then twelve server boots in
-counterbalanced order, comparing the game-loop thread's CPU while idle and over one preparation. It takes
-about 20 minutes on a quiet machine. The report in `build/integration/reports/lab/` gives each metric's
+boot, then twelve server boots in counterbalanced order, comparing the game-loop thread's CPU while idle
+and over one preparation. It takes about 20 minutes on a quiet machine. The report in `build/integration/reports/lab/` gives each metric's
 median paired change, its interval and the coverage it reached; a regression is reported, not failed.
 The manual "Lab" workflow runs the same script in CI, where shared runners make intervals wider.
 
