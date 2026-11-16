@@ -147,8 +147,11 @@ jobs:
           summary = report.get("summary")
           refs = report.get("refs", {})
           print(f"### Lab: candidate `{refs.get('candidate')}` against baseline `{refs.get('baseline')}`\n")
-          print(f"mc-lab {report['lab']}, {len(report['boots'])} of {len(report['design']['sequence'])} boots, "
+          print(f"mc-lab {report['lab']}, {len(report['boots'])} of {len(report['design']['sequence'])} boots "
+                f"(plus {len(report.get('warmups', []))} unpaired warm-ups), "
                 f"host load {report['host'].get('load_1m')} at the start.\n")
+          if report.get("same_jar"):
+              print("Both arms ran the same jar: this is an A/A calibration of the runner.\n")
           if not summary:
               print("The measurement did not finish; the report holds the boots recorded so far.")
               sys.exit(0)

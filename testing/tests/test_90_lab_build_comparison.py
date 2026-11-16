@@ -10,6 +10,9 @@ Every boot is a fresh server with two linked players and a run in progress, meas
 * preparation: the thread's CPU over one whole ``soullink prepare`` of a fixed seed and radius.
 
 Boots run in ABBA/BAAB blocks and adjacent boots pair, so slow drift on the host cancels within a pair.
+Each session first runs ``WARMUP_BOOTS`` unmeasured boots of the next arm: the first boot on a cold host
+idled about a third slower than the rest in the first smoke run. Warm-up boots are recorded, never paired.
+With the same jar in both arms the run is an A/A calibration: its spread is what this host cannot resolve.
 The report states each metric's median paired change, its exact interval and the achieved coverage. A
 regression or an inconclusive interval is a result, not a failure: the test fails only when the
 measurement itself breaks. The report is rewritten after every boot, and a rerun with the same design
@@ -46,6 +49,7 @@ SOULLINK_CONFIG = {"preloadRadius": PRELOAD_RADIUS}
 JAR_GLOB = "soullink-*.jar"
 TICKS_PER_SECOND = 20
 METRICS = ("idle_cpu_ms_per_tick", "preparation_cpu_seconds")
+WARMUP_BOOTS = 1
 
 
 def cpu_ms_per_tick(window: dict) -> float:
@@ -116,27 +120,30 @@ def test_build_comparison(env, lab_host, server_thread):
         "blocks": BLOCKS, "sequence": list(sequence), "idle_seconds": IDLE_SECONDS,
         "preload_radius": PRELOAD_RADIUS, "prepare_seed": PREPARE_SEED, "level_seed": LEVEL_SEED,
         "loader": os.environ.get("MC_TEST_LOADER", "fabric"), "metrics": list(METRICS),
+        "warmup_boots_per_session": WARMUP_BOOTS,
         "arms": {BASELINE: describe_jar(baseline_jar), CANDIDATE: describe_jar(candidates[0])},
     }
     refs = {BASELINE: os.environ.get("MC_LAB_BASELINE_REF"), CANDIDATE: os.environ.get("MC_LAB_CANDIDATE_REF")}
     report_dir = Path(os.environ.get("MC_LAB_REPORT_DIR", install.parent / "reports" / "lab"))
     report_dir.mkdir(parents=True, exist_ok=True)
     report_path = report_dir / "build-comparison.json"
+    same_jar = design["arms"][BASELINE]["sha256"] == design["arms"][CANDIDATE]["sha256"]
     boots: list[dict] = []
+    warmups: list[dict] = []
     if report_path.exists():
         previous = json.loads(report_path.read_text())
         if previous.get("design") == design and previous.get("lab") == mc_lab.__version__:
-            boots = previous["boots"]
+            boots, warmups = previous["boots"], previous.get("warmups", [])
             print(f"resuming from {len(boots)} recorded boots in {report_path}")
 
     def write(summary: dict | None = None) -> None:
-        report = {"lab": mc_lab.__version__, "design": design, "refs": refs, "host": lab_host.as_dict(),
-                  "host_snapshot": snapshot_host(), "boots": boots, "summary": summary}
+        report = {"lab": mc_lab.__version__, "design": design, "refs": refs, "same_jar": same_jar,
+                  "host": lab_host.as_dict(), "host_snapshot": snapshot_host(), "warmups": warmups,
+                  "boots": boots, "summary": summary}
         report_path.write_text(json.dumps(report, indent=2) + "\n")
 
-    for index in range(len(boots), len(sequence)):
-        arm = sequence[index]
-        server = SoulLinkServer(install, f"lab-{index:02d}-{arm}", java, packets, SOULLINK_CONFIG, LEVEL_SEED,
+    def boot(session: str, arm: str) -> dict:
+        server = SoulLinkServer(install, session, java, packets, SOULLINK_CONFIG, LEVEL_SEED,
                                 mods=baseline_mods if arm == BASELINE else None)
         server.start()
         try:
@@ -144,7 +151,22 @@ def test_build_comparison(env, lab_host, server_thread):
         finally:
             server.stop()
         problems = server.suspicious_lines()
-        assert not problems, f"boot {index} ({arm}) logged errors:\n" + "\n".join(problems)
+        assert not problems, f"{session} logged errors:\n" + "\n".join(problems)
+        return result
+
+    if len(boots) < len(sequence):
+        for number in range(WARMUP_BOOTS):
+            arm = sequence[len(boots)]
+            result = boot(f"lab-warmup-{len(warmups):02d}-{arm}", arm)
+            warmups.append({"before_boot": len(boots), "arm": arm, **result})
+            write()
+            print(f"warm-up {number + 1}/{WARMUP_BOOTS} {arm} (not paired): idle "
+                  f"{result['idle_cpu_ms_per_tick']:.3f} ms/tick, preparation "
+                  f"{result['preparation_cpu_seconds']:.2f} s CPU")
+
+    for index in range(len(boots), len(sequence)):
+        arm = sequence[index]
+        result = boot(f"lab-{index:02d}-{arm}", arm)
         boots.append({"index": index, "arm": arm, **result})
         write()
         print(f"boot {index + 1}/{len(sequence)} {arm}: idle {result['idle_cpu_ms_per_tick']:.3f} ms/tick, "
@@ -152,7 +174,7 @@ def test_build_comparison(env, lab_host, server_thread):
 
     summary = summarize(boots)
     write(summary)
-    print(f"report: {report_path}")
+    print(f"report: {report_path}" + (" (A/A: both arms ran the same jar)" if same_jar else ""))
     for metric in METRICS:
         row = summary[metric]
         print(f"{metric}: median {row['median_percent']:+.2f}% "
