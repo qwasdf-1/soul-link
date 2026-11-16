@@ -1,0 +1,174 @@
+name: Lab
+
+# The paired build-against-build measurement (testing/tests/test_90_lab_build_comparison.py), run on
+# demand: the dispatched ref is the candidate, `baseline_ref` the baseline. It runs
+# scripts/lab-compare.sh, the same entry point as a local run. A shared runner is noisier than a quiet
+# local host; the paired, counterbalanced design cancels slow drift, and the report records the host
+# load and every window's quality verdict. A regression is reported in the summary, not as a failure.
+
+on:
+  workflow_dispatch:
+    inputs:
+      baseline_ref:
+        description: Baseline Soul Link ref (branch, tag or commit)
+        default: main
+        required: true
+      minecraft_version:
+        description: Minecraft version (a Fabric row of gradle/minecraft-targets.json)
+        default: '26.2'
+        required: true
+      blocks:
+        description: ABBA blocks (4 boots and 2 pairs each; 3 is the fewest that reach 95% coverage)
+        default: '3'
+        required: true
+
+jobs:
+  compare:
+    name: lab (${{ inputs.minecraft_version }} fabric, against ${{ inputs.baseline_ref }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    defaults:
+      run:
+        working-directory: soul-link
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: soul-link
+
+      - name: Resolve the target row and the baseline commit
+        id: target
+        env:
+          MINECRAFT_VERSION: ${{ inputs.minecraft_version }}
+          BASELINE_REF: ${{ inputs.baseline_ref }}
+          BLOCKS: ${{ inputs.blocks }}
+        run: |
+          set -euo pipefail
+          case "$BLOCKS" in
+            ''|*[!0-9]*) echo "blocks must be a positive integer, got '$BLOCKS'" >&2; exit 1 ;;
+          esac
+          row=$(jq -c --arg version "$MINECRAFT_VERSION" \
+            '[.include[] | select(.loader == "fabric" and .minecraft_version == $version)] | first // empty' \
+            gradle/minecraft-targets.json)
+          if [ -z "$row" ]; then
+            echo "No Fabric row for Minecraft $MINECRAFT_VERSION in gradle/minecraft-targets.json" >&2
+            exit 1
+          fi
+          for key in minecraft_version loom_version fabric_loader_version fabric_api_version java_version protocol_version; do
+            echo "$key=$(jq -r --arg key "$key" '.[$key]' <<<"$row")" >> "$GITHUB_OUTPUT"
+          done
+          git fetch --no-tags --depth=1 origin "$BASELINE_REF"
+          echo "baseline_sha=$(git rev-parse FETCH_HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve the Terra Rasa ref
+        id: terra-rasa-ref
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          ref="$REF_NAME"
+          # Same rule as CI: Terra Rasa's branch of the same name when it exists, main otherwise. Both
+          # arms build against this one checkout, so the comparison isolates Soul Link's own changes.
+          if refs=$(git ls-remote --heads https://github.com/qwasdf-1/terra-rasa.git "$ref" 2>&1); then
+            if [ -n "$refs" ]; then
+              echo "ref=$ref" >> "$GITHUB_OUTPUT"
+            else
+              echo "ref=main" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "Could not list Terra Rasa's branches: $refs" >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+        with:
+          repository: qwasdf-1/terra-rasa
+          ref: ${{ steps.terra-rasa-ref.outputs.ref }}
+          path: terra-rasa
+
+      # The suites import mc-testkit and mc-lab from a sibling ../mc-tooling checkout.
+      - name: Check out the pinned private mc-tooling repository
+        uses: actions/checkout@v7
+        with:
+          repository: qwasdf-1/mc-tooling
+          ref: 6426a25dc3fbebf1d93eb577aa2194e51b8d954e
+          path: mc-tooling
+          persist-credentials: false
+          token: ${{ secrets.MC_TOOLING_READ_TOKEN }}
+
+      - name: Install the Gradle JVM
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Build and publish Terra Rasa for Minecraft ${{ inputs.minecraft_version }}
+        working-directory: terra-rasa
+        run: >-
+          ./gradlew publishToMavenLocal
+          -Ploader=fabric
+          -Ploom_version=${{ steps.target.outputs.loom_version }}
+          -Pminecraft_version=${{ steps.target.outputs.minecraft_version }}
+          -Pfabric_loader_version=${{ steps.target.outputs.fabric_loader_version }}
+          -Pfabric_api_version=${{ steps.target.outputs.fabric_api_version }}
+          -Pjava_version=${{ steps.target.outputs.java_version }}
+
+      - name: Paired measurement against ${{ inputs.baseline_ref }}
+        env:
+          MC_TEST_PROTOCOL_VERSION: ${{ steps.target.outputs.protocol_version }}
+          MC_LAB_BLOCKS: ${{ inputs.blocks }}
+          TERRA_RASA_PATH: ../terra-rasa
+        run: >-
+          scripts/lab-compare.sh ${{ steps.target.outputs.baseline_sha }}
+          -Ploader=fabric
+          -Ploom_version=${{ steps.target.outputs.loom_version }}
+          -Pminecraft_version=${{ steps.target.outputs.minecraft_version }}
+          -Pfabric_loader_version=${{ steps.target.outputs.fabric_loader_version }}
+          -Pfabric_api_version=${{ steps.target.outputs.fabric_api_version }}
+          -Pjava_version=${{ steps.target.outputs.java_version }}
+
+      - name: Summarize the report
+        if: always()
+        run: |
+          set -euo pipefail
+          report=build/integration/reports/lab/build-comparison.json
+          if [ ! -f "$report" ]; then
+            echo "No lab report was written." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          python3 - "$report" >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          import json, sys
+          report = json.load(open(sys.argv[1]))
+          summary = report.get("summary")
+          refs = report.get("refs", {})
+          print(f"### Lab: candidate `{refs.get('candidate')}` against baseline `{refs.get('baseline')}`\n")
+          print(f"mc-lab {report['lab']}, {len(report['boots'])} of {len(report['design']['sequence'])} boots, "
+                f"host load {report['host'].get('load_1m')} at the start.\n")
+          if not summary:
+              print("The measurement did not finish; the report holds the boots recorded so far.")
+              sys.exit(0)
+          print("| metric | median change | interval | coverage | pairs | no-regression |")
+          print("| --- | --- | --- | --- | --- | --- |")
+          for metric in report["design"]["metrics"]:
+              row = summary[metric]
+              print(f"| {metric} | {row['median_percent']:+.2f}% | [{row['ci_low_percent']:+.2f}%, "
+                    f"{row['ci_high_percent']:+.2f}%] | {row['confidence_achieved']:.1%} | {row['n']} | "
+                    f"{row['no_regression_decision']} |")
+          print(f"\nWindows failing the quality rule: {summary['windows_failing_quality']}; "
+                f"noisy boots: {summary['noisy_boots']}.")
+          EOF
+
+      - name: Upload the report and server logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lab-${{ inputs.minecraft_version }}-${{ steps.target.outputs.baseline_sha }}
+          path: |
+            soul-link/build/integration/reports/lab/
+            soul-link/build/integration/server/sessions/lab-*/console.log
+          if-no-files-found: warn

@@ -1,0 +1,160 @@
+"""Paired build-against-build cost (an mc-lab measurement: runs only with ``--lab``).
+
+Compares the Soul Link jar this build installed (``candidate``) with another build's jar (``baseline``,
+from ``MC_LAB_BASELINE_JAR``) on the same install. ``scripts/lab-compare.sh <ref>`` builds a baseline from
+a git ref and runs this; the manual "Lab" workflow does the same in CI.
+
+Every boot is a fresh server with two linked players and a run in progress, measured in two phases:
+
+* idle: the game-loop thread's CPU per tick over ``IDLE_SECONDS`` once preparation has settled;
+* preparation: the thread's CPU over one whole ``soullink prepare`` of a fixed seed and radius.
+
+Boots run in ABBA/BAAB blocks and adjacent boots pair, so slow drift on the host cancels within a pair.
+The report states each metric's median paired change, its exact interval and the achieved coverage. A
+regression or an inconclusive interval is a result, not a failure: the test fails only when the
+measurement itself breaks. The report is rewritten after every boot, and a rerun with the same design
+and jars resumes from the boots already recorded.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import time
+
+import pytest
+
+import mc_lab
+from helpers import SoulLinkServer, start_run
+from mc_lab.arms import describe_jar, mods_variant
+from mc_lab.design import abba_blocks, adjacent_pairs, boot_sequence
+from mc_lab.host import is_noisy, load_average_1m, snapshot_host
+from mc_lab.stats import paired_percent_changes, summarize_paired_changes
+from mc_lab.ticks import parse_tick_query
+
+pytestmark = pytest.mark.lab
+
+BASELINE, CANDIDATE = "baseline", "candidate"
+#: Three blocks are twelve boots and six pairs: the fewest that reach 95% coverage (96.9%).
+BLOCKS = int(os.environ.get("MC_LAB_BLOCKS", "3"))
+IDLE_SECONDS = 30
+PRELOAD_RADIUS = 6
+PREPARE_SEED = 20261116
+LEVEL_SEED = 4242
+SOULLINK_CONFIG = {"preloadRadius": PRELOAD_RADIUS}
+JAR_GLOB = "soullink-*.jar"
+TICKS_PER_SECOND = 20
+METRICS = ("idle_cpu_ms_per_tick", "preparation_cpu_seconds")
+
+
+def cpu_ms_per_tick(window: dict) -> float:
+    return window["cpu_ns"] / 1e6 / (window["wall_ns"] / 1e9 * TICKS_PER_SECOND)
+
+
+def measure_boot(server: SoulLinkServer, server_thread) -> dict:
+    players = [server.bot("Alice"), server.bot("Bob")]
+    start_run(server, players)
+    server.wait_until(
+        lambda status: status["status"] == "RUNNING"
+        and status["preparation"].get("active") is None
+        and status["preparation"].get("readyCount", 0) >= 1,
+        360,
+        "the live run and its future-run pool to settle",
+    )
+    thread = server_thread(server)
+    load_before = load_average_1m()
+    idle = thread.measure(lambda: time.sleep(IDLE_SECONDS))
+    idle_ticks = parse_tick_query(server.rcon("tick query"))
+    idle_cost = server.status().get("tickCost", {}).get("idle")
+    with thread.window() as preparation:
+        response = server.rcon(f"soullink prepare {PREPARE_SEED} {PRELOAD_RADIUS}")
+        assert "preparing a run" in response.lower(), response
+        server.wait_until(lambda status: status["preparation"].get("ready", {}).get("seed") == PREPARE_SEED
+                          and status["preparation"].get("active") is None, 360, "the measured preparation")
+    ready = server.status()["preparation"]["ready"]
+    for bot in players:
+        bot.assert_connected()
+    load_after = load_average_1m()
+    return {
+        "idle_cpu_ms_per_tick": cpu_ms_per_tick(idle),
+        "preparation_cpu_seconds": preparation.result["cpu_ns"] / 1e9,
+        "quality_pass": idle["quality_pass"] and preparation.result["quality_pass"],
+        "noisy": is_noisy(max(load_before, load_after)),
+        "load_1m": [load_before, load_after],
+        "idle_window": idle,
+        "preparation_window": preparation.result,
+        "idle_ticks": idle_ticks,
+        "idle_tick_cost": idle_cost,
+        "preparation_timings_millis": ready.get("timingsMillis"),
+    }
+
+
+def summarize(boots: list[dict]) -> dict:
+    pairs = [{boots[i]["arm"]: boots[i], boots[i + 1]["arm"]: boots[i + 1]} for i in range(0, len(boots) - 1, 2)]
+    summary = {}
+    for metric in METRICS:
+        changes = paired_percent_changes(pairs, metric=metric, baseline_arm=BASELINE, candidate_arm=CANDIDATE)
+        summary[metric] = {"changes_percent": changes, **summarize_paired_changes(changes)}
+    summary["windows_failing_quality"] = sum(not boot["quality_pass"] for boot in boots)
+    summary["noisy_boots"] = sum(boot["noisy"] for boot in boots)
+    return summary
+
+
+def test_build_comparison(env, lab_host, server_thread):
+    install, java, packets = env
+    if not os.environ.get("MC_LAB_BASELINE_JAR"):
+        pytest.fail("set MC_LAB_BASELINE_JAR to the baseline Soul Link jar (scripts/lab-compare.sh <ref> does)")
+    baseline_jar = Path(os.environ["MC_LAB_BASELINE_JAR"]).resolve()
+    candidates = sorted((install / "mods").glob(JAR_GLOB))
+    assert len(candidates) == 1, f"expected one {JAR_GLOB} in {install / 'mods'}, found {candidates}"
+    baseline_mods = mods_variant(install / "mods", install / "lab" / "baseline-mods", replace=JAR_GLOB,
+                                 jar=baseline_jar)
+    sequence = boot_sequence(abba_blocks(BASELINE, CANDIDATE, BLOCKS))
+    adjacent_pairs(sequence)  # validates the design before any boot
+    design = {
+        "blocks": BLOCKS, "sequence": list(sequence), "idle_seconds": IDLE_SECONDS,
+        "preload_radius": PRELOAD_RADIUS, "prepare_seed": PREPARE_SEED, "level_seed": LEVEL_SEED,
+        "loader": os.environ.get("MC_TEST_LOADER", "fabric"), "metrics": list(METRICS),
+        "arms": {BASELINE: describe_jar(baseline_jar), CANDIDATE: describe_jar(candidates[0])},
+    }
+    refs = {BASELINE: os.environ.get("MC_LAB_BASELINE_REF"), CANDIDATE: os.environ.get("MC_LAB_CANDIDATE_REF")}
+    report_dir = Path(os.environ.get("MC_LAB_REPORT_DIR", install.parent / "reports" / "lab"))
+    report_dir.mkdir(parents=True, exist_ok=True)
+    report_path = report_dir / "build-comparison.json"
+    boots: list[dict] = []
+    if report_path.exists():
+        previous = json.loads(report_path.read_text())
+        if previous.get("design") == design and previous.get("lab") == mc_lab.__version__:
+            boots = previous["boots"]
+            print(f"resuming from {len(boots)} recorded boots in {report_path}")
+
+    def write(summary: dict | None = None) -> None:
+        report = {"lab": mc_lab.__version__, "design": design, "refs": refs, "host": lab_host.as_dict(),
+                  "host_snapshot": snapshot_host(), "boots": boots, "summary": summary}
+        report_path.write_text(json.dumps(report, indent=2) + "\n")
+
+    for index in range(len(boots), len(sequence)):
+        arm = sequence[index]
+        server = SoulLinkServer(install, f"lab-{index:02d}-{arm}", java, packets, SOULLINK_CONFIG, LEVEL_SEED,
+                                mods=baseline_mods if arm == BASELINE else None)
+        server.start()
+        try:
+            result = measure_boot(server, server_thread)
+        finally:
+            server.stop()
+        problems = server.suspicious_lines()
+        assert not problems, f"boot {index} ({arm}) logged errors:\n" + "\n".join(problems)
+        boots.append({"index": index, "arm": arm, **result})
+        write()
+        print(f"boot {index + 1}/{len(sequence)} {arm}: idle {result['idle_cpu_ms_per_tick']:.3f} ms/tick, "
+              f"preparation {result['preparation_cpu_seconds']:.2f} s CPU")
+
+    summary = summarize(boots)
+    write(summary)
+    print(f"report: {report_path}")
+    for metric in METRICS:
+        row = summary[metric]
+        print(f"{metric}: median {row['median_percent']:+.2f}% "
+              f"[{row['ci_low_percent']:+.2f}%, {row['ci_high_percent']:+.2f}%] at "
+              f"{row['confidence_achieved']:.1%} over {row['n']} pairs -> {row['no_regression_decision']}")

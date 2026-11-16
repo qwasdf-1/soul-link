@@ -3,15 +3,17 @@ name = "soullink-testing"
 version = "0.1.0"
 description = "Real dedicated-server integration tests for the Soul Link Fabric mod"
 requires-python = ">=3.14"
-dependencies = ["pytest>=8.3", "mc-testkit"]
+dependencies = ["pytest>=8.3", "mc-testkit", "mc-lab"]
 
 [tool.uv]
 package = false
 
 [tool.uv.sources]
-# The shared test kit lives in the private mc-tooling repository, checked out next to this one
-# (../mc-tooling), as in the mc-mods workspace and in CI.
+# The shared test kit and measurement lab live in the private mc-tooling repository, checked out next
+# to this one (../mc-tooling), as in the mc-mods workspace and in CI. mc-lab's pytest plugin adds the
+# opt-in `lab` marker (skipped unless --lab).
 mc-testkit = { path = "../../mc-tooling/mc-testkit", editable = true }
+mc-lab = { path = "../../mc-tooling/mc-lab", editable = true }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

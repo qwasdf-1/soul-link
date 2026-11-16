@@ -12,7 +12,15 @@ cd ../soul-link && ./gradlew build  # default target is 26.2; CI builds and test
 ./gradlew integrationTest   # real dedicated-server suite
 ./gradlew modpackTest       # reference modpack suite, currently pinned to 26.2
 ./gradlew integrationTest -Ppytest.args="-s tests/test_02_gameplay.py"   # one module
+scripts/lab-compare.sh main  # paired performance cost of this checkout against another ref
 ```
+
+`scripts/lab-compare.sh <ref> [gradle args...]` builds the baseline ref in a temporary worktree and runs
+the opt-in `lab` measurement (`testing/tests/test_90_lab_build_comparison.py`): twelve server boots in
+counterbalanced order, comparing the game-loop thread's CPU while idle and over one preparation. It takes
+about 20 minutes on a quiet machine. The report in `build/integration/reports/lab/` gives each metric's
+median paired change, its interval and the coverage it reached; a regression is reported, not failed.
+The manual "Lab" workflow runs the same script in CI, where shared runners make intervals wider.
 
 CI runs the build and unit tests for all six targets on every push and pull request. The dedicated-server suite runs for each target on manual dispatch; the reference modpack suite is pinned to 26.2. Run the relevant server suite locally before opening a pull request that changes gameplay or the run lifecycle.
 

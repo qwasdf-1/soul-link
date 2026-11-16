@@ -21,6 +21,21 @@ wheels = [
 ]
 
 [[package]]
+name = "mc-lab"
+version = "0.2.0"
+source = { editable = "../../mc-tooling/mc-lab" }
+dependencies = [
+    { name = "mc-testkit" },
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "mc-testkit", editable = "../../mc-tooling/mc-testkit" },
+    { name = "pytest", specifier = ">=8.3" },
+]
+
+[[package]]
 name = "mc-testkit"
 version = "0.1.0"
 source = { editable = "../../mc-tooling/mc-testkit" }
@@ -79,12 +94,14 @@ name = "soullink-testing"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "mc-lab" },
     { name = "mc-testkit" },
     { name = "pytest" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "mc-lab", editable = "../../mc-tooling/mc-lab" },
     { name = "mc-testkit", editable = "../../mc-tooling/mc-testkit" },
     { name = "pytest", specifier = ">=8.3" },
 ]

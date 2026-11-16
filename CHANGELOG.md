@@ -5,6 +5,13 @@
 ### Changed
 
 - The integration suites now import the shared `mc-testkit` from the private `mc-tooling` repository, checked out at `../mc-tooling`, instead of Terra Rasa's bundled test kit. This also restores their dependency resolution in CI, which has failed since 0.6.0.
+- The tick-cost test reports the game-loop thread's CPU per tick while idle and preparing, measured with
+  the shared `mc-lab`, and parses `/tick query` with it.
+
+### Added
+
+- `scripts/lab-compare.sh` and a manual "Lab" workflow measure this build's server-thread CPU against
+  another ref's in paired, counterbalanced server boots (maintainers only, like the integration suites).
 
 ## 0.6.0
 

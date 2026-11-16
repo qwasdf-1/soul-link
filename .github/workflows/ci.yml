@@ -196,13 +196,13 @@ jobs:
           ref: ${{ steps.terra-rasa-ref.outputs.ref }}
           path: terra-rasa
 
-      # The suites import mc-testkit from a sibling ../mc-tooling checkout.
+      # The suites import mc-testkit and mc-lab from a sibling ../mc-tooling checkout.
       - name: Check out the pinned private mc-tooling repository
         if: matrix.loader == 'fabric'
         uses: actions/checkout@v7
         with:
           repository: qwasdf-1/mc-tooling
-          ref: 080c59d4e924840cc9a34288597dc78e74076e2a
+          ref: 6426a25dc3fbebf1d93eb577aa2194e51b8d954e
           path: mc-tooling
           persist-credentials: false
           # Cross-repository private access requires a read-only token.
