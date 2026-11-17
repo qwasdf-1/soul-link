@@ -12,6 +12,8 @@
 
 - `scripts/lab-compare.sh` and a manual "Lab" workflow measure this build's server-thread CPU against
   another ref's in paired, counterbalanced server boots (maintainers only, like the integration suites).
+  The world profile, extra game rules, CPU pinning and heap are configurable; with CPUs pinned the
+  server thread's CPU wait is reported as contention rather than failing a window's quality check.
 
 ## 0.6.0
 

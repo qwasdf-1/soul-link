@@ -23,8 +23,10 @@ median paired change, its interval and the coverage it reached; a regression is 
 The manual "Lab" workflow runs the same script in CI, where shared runners make intervals wider.
 Environment variables choose the conditions: `MC_LAB_WORLD=isolated` turns off mob spawning and freezes
 time and weather (the default `real` changes nothing), `MC_LAB_GAMERULES=name=value,...` holds single
-variables still, and `MC_LAB_CPUS=4` / `MC_LAB_HEAP=2G` constrain the server. The workflow has the same
-inputs.
+variables still, and `MC_LAB_CPUS=4` / `MC_LAB_HEAP=2G` constrain the server. With CPUs pinned, the
+server thread's wait for a CPU is the contention being measured: it is reported per arm and phase instead
+of failing a window's quality check. Each boot confirms its CPUs and heap on the running JVM. The workflow
+has the same inputs.
 
 CI runs the build and unit tests for all six targets on every push and pull request. The dedicated-server suite runs for each target on manual dispatch; the reference modpack suite is pinned to 26.2. Run the relevant server suite locally before opening a pull request that changes gameplay or the run lifecycle.
 

@@ -16,6 +16,8 @@ Both arms run from their own copy of the install's mods folder, differing only i
 The lab configuration (``mc_lab.profile``) comes from the environment and is part of the design:
 ``MC_LAB_WORLD`` (``real`` by default, or ``isolated``: no mob spawning, time and weather frozen),
 ``MC_LAB_GAMERULES`` for single variables, and ``MC_LAB_CPUS`` / ``MC_LAB_HEAP`` to constrain the server.
+With CPUs pinned, the server thread's wait for a CPU is the contention under study: it no longer fails a
+window's quality verdict and the summary reports each arm's median wait fraction per phase.
 
 Boots run in ABBA/BAAB blocks and adjacent boots pair, so slow drift on the host cancels within a pair.
 Each session first runs ``WARMUP_BOOTS`` unmeasured boots of the next arm: the first boot on a cold host
@@ -31,6 +33,7 @@ from __future__ import annotations
 
 import json
 import os
+import statistics
 from pathlib import Path
 import time
 
@@ -65,7 +68,17 @@ def cpu_ms_per_tick(window: dict) -> float:
     return window["cpu_ns"] / 1e6 / (window["wall_ns"] / 1e9 * TICKS_PER_SECOND)
 
 
-def measure_boot(server: SoulLinkServer, server_thread) -> dict:
+def jvm_heap(pid: int) -> str | None:
+    """The ``-Xmx`` the running JVM took (the last one on its command line wins)."""
+    try:
+        arguments = Path(f"/proc/{pid}/cmdline").read_bytes().decode().split("\0")
+    except OSError:
+        return None
+    sizes = [argument[len("-Xmx"):] for argument in arguments if argument.startswith("-Xmx")]
+    return sizes[-1] if sizes else None
+
+
+def measure_boot(server: SoulLinkServer, server_thread, max_wait_fraction: float | None) -> dict:
     players = [server.bot("Alice"), server.bot("Bob")]
     start_run(server, players)
     server.wait_until(
@@ -77,10 +90,10 @@ def measure_boot(server: SoulLinkServer, server_thread) -> dict:
     )
     thread = server_thread(server)
     load_before = load_average_1m()
-    idle = thread.measure(lambda: time.sleep(IDLE_SECONDS))
+    idle = thread.measure(lambda: time.sleep(IDLE_SECONDS), max_wait_fraction)
     idle_ticks = parse_tick_query(server.rcon("tick query"))
     idle_cost = server.status().get("tickCost", {}).get("idle")
-    with thread.window() as preparation:
+    with thread.window(max_wait_fraction) as preparation:
         response = server.rcon(f"soullink prepare {PREPARE_SEED} {PRELOAD_RADIUS}")
         assert "preparing a run" in response.lower(), response
         server.wait_until(lambda status: status["preparation"].get("ready", {}).get("seed") == PREPARE_SEED
@@ -115,6 +128,11 @@ def summarize(boots: list[dict]) -> dict:
         changes = paired_percent_changes(pairs, metric=metric, baseline_arm=BASELINE, candidate_arm=CANDIDATE)
         summary[metric] = {"changes_percent": changes, **summarize_paired_changes(changes)}
     summary["windows_failing_quality"] = sum(not boot["quality_pass"] for boot in boots)
+    # With pinned CPUs the wait is the contention under study, reported here instead of failing quality.
+    summary["runqueue_wait_fraction"] = {
+        phase: {arm: statistics.median(boot[f"{phase}_window"]["runqueue_wait_fraction"]
+                                       for boot in boots if boot["arm"] == arm) for arm in (BASELINE, CANDIDATE)}
+        for phase in ("idle", "preparation")}
     summary["noisy_boots"] = sum(boot["noisy"] for boot in boots)
     return summary
 
@@ -166,13 +184,16 @@ def test_build_comparison(env, lab_host, server_thread):
             pinned = allowed_cpus(server.pid)
             if config.limits.cpus is not None:
                 assert pinned and parse_cpus(pinned) == config.limits.cpus, f"{session} runs on CPUs {pinned}"
+            heap = jvm_heap(server.pid)
+            if config.limits.heap is not None:
+                assert heap == config.limits.heap, f"{session} runs with -Xmx{heap}"
             applied = apply_gamerules(server.rcon, config.gamerules)
-            result = measure_boot(server, server_thread)
+            result = measure_boot(server, server_thread, config.max_wait_fraction())
         finally:
             server.stop()
         problems = server.suspicious_lines()
         assert not problems, f"{session} logged errors:\n" + "\n".join(problems)
-        return {"allowed_cpus": pinned, "gamerules_applied": applied, **result}
+        return {"allowed_cpus": pinned, "max_heap": heap, "gamerules_applied": applied, **result}
 
     if len(boots) < len(sequence):
         for number in range(WARMUP_BOOTS):
@@ -196,6 +217,9 @@ def test_build_comparison(env, lab_host, server_thread):
     write(summary)
     print(f"report: {report_path}" + (" (A/A: both arms ran the same jar)" if same_jar else ""))
     print("lab configuration:", config.as_dict())
+    print(f"windows failing quality: {summary['windows_failing_quality']}; median runqueue wait fraction: "
+          + ", ".join(f"{phase} {arm} {fraction:.3f}" for phase, arms in summary["runqueue_wait_fraction"].items()
+                      for arm, fraction in arms.items()))
     for metric in METRICS:
         row = summary[metric]
         if "unavailable" in row:

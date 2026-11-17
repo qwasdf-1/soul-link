@@ -107,7 +107,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: qwasdf-1/mc-tooling
-          ref: 1bc396efdf8be316c7ceb10b35bfce7a681fa8ac
+          ref: 5c5c4b27c889c36a9f6f51a1adca0435e8ce6720
           path: mc-tooling
           persist-credentials: false
           token: ${{ secrets.MC_TOOLING_READ_TOKEN }}
@@ -189,6 +189,12 @@ jobs:
                     f"{row['no_regression_decision']} |")
           print(f"\nWindows failing the quality rule: {summary['windows_failing_quality']}; "
                 f"noisy boots: {summary['noisy_boots']}.")
+          waits = summary.get("runqueue_wait_fraction")
+          if waits:
+              print("Median runqueue wait fraction (contention for a CPU; with pinned CPUs it is a result, "
+                    "not a quality failure): " + "; ".join(
+                        f"{phase} " + ", ".join(f"{arm} {value:.3f}" for arm, value in arms.items())
+                        for phase, arms in waits.items()) + ".")
           EOF
 
       - name: Upload the report and server logs
