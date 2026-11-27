@@ -1,0 +1,10 @@
+{
+  "curseforge_id": 1774398,
+  "summary": "Cooperative Minecraft challenge runs with shared vitality, fresh seeded worlds, and seamless resets without reconnecting.",
+  "intro": true,
+  "sections": [
+    "## Features"
+  ],
+  "install": "Install the matching Fabric or NeoForge JAR on the dedicated server or single-player/LAN host. Fabric requires Fabric API and bundles Terra Rasa; NeoForge requires the matching Terra Rasa mod separately. Remote players do not need Soul Link installed.",
+  "wiki": "docs/gameplay.md"
+}
