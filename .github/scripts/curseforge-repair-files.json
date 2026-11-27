@@ -1,0 +1,61 @@
+{
+  "project_id": 1774398,
+  "files": [
+    {
+      "id": 9520535,
+      "jar": "soullink-mc26.1-0.6.0.jar"
+    },
+    {
+      "id": 9520526,
+      "jar": "soullink-mc26.1.1-0.6.0.jar"
+    },
+    {
+      "id": 9520532,
+      "jar": "soullink-mc1.21.11-0.6.0.jar"
+    },
+    {
+      "id": 9520524,
+      "jar": "soullink-mc1.21.1-0.6.0.jar"
+    },
+    {
+      "id": 9520533,
+      "jar": "soullink-mc26.1.2-0.6.0.jar"
+    },
+    {
+      "id": 9520530,
+      "jar": "soullink-mc26.1.2-neoforge-0.6.0.jar"
+    },
+    {
+      "id": 9520528,
+      "jar": "soullink-mc26.3-neoforge-0.6.0.jar"
+    },
+    {
+      "id": 9520523,
+      "jar": "soullink-mc26.2-neoforge-0.6.0.jar"
+    },
+    {
+      "id": 9520527,
+      "jar": "soullink-mc26.2-0.6.0.jar"
+    },
+    {
+      "id": 9520525,
+      "jar": "soullink-mc1.21.4-0.6.0.jar"
+    },
+    {
+      "id": 9520534,
+      "jar": "soullink-mc26.3-0.6.0.jar"
+    },
+    {
+      "id": 9511755,
+      "jar": "soullink-mc26.1.1-0.5.1.jar"
+    },
+    {
+      "id": 9511757,
+      "jar": "soullink-mc26.3-0.5.1.jar"
+    },
+    {
+      "id": 9376122,
+      "jar": "soullink-mc26.1.2-0.4.3.jar"
+    }
+  ]
+}
