@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import json
+import tomllib
 
 from helpers import start_run, wait_true
 
@@ -18,7 +18,10 @@ def test_shared_vitality_rule_is_persisted_and_snapshotted(server):
     assert status["rules"]["sharedVitality"]
     assert not status["nextRules"]["sharedVitality"]
     assert status["shared"]["enabled"] is True
-    config = json.loads((server.directory / "config" / "soullink.json").read_text())
+    config = tomllib.loads((server.directory / "config" / "soullink.toml").read_text())
+    assert config.get("sharedVitality", True) is True
+    server.rcon("soullink rules sharedVitality false default")
+    config = tomllib.loads((server.directory / "config" / "soullink.toml").read_text())
     assert config["sharedVitality"] is False
 
     next_run = start_run(server, players, command="soullink reset")

@@ -1,19 +1,20 @@
 # Changelog
 
-## Unreleased
-
-### Changed
-
-- The integration suites now import the shared `mc-testkit` from the private `mc-tooling` repository, checked out at `../mc-tooling`, instead of Terra Rasa's bundled test kit. This also restores their dependency resolution in CI, which has failed since 0.6.0.
-- The tick-cost test reports the game-loop thread's CPU per tick while idle and preparing, measured with
-  the shared `mc-lab`, and parses `/tick query` with it.
+## 0.7.0
 
 ### Added
 
-- `scripts/lab-compare.sh` and a manual "Lab" workflow measure this build's server-thread CPU against
-  another ref's in paired, counterbalanced server boots (maintainers only, like the integration suites).
-  The world profile, extra game rules, CPU pinning and heap are configurable; with CPUs pinned the
-  server thread's CPU wait is reported as contention rather than failing a window's quality check.
+- Migrate operator configuration from `config/soullink.json` to `config/soullink.toml` (auto-migrating existing JSON configs on startup) and add `naturalRegeneration`, `timerVisible`, `damageReport`, and `runStats` defaults.
+- Support optional trailing `default` on `/soullink rules <rule> <value> [default]` so live command changes stay in memory unless `default` is specified to persist them to `config/soullink.toml` (while `/soullink setup` GUI toggles save directly).
+- Add toggleable timer visibility (`timerVisible`), damage report verbosity (`damageReport`: `normal`, `minimal`, `off`), and concise end-of-run player stats (`runStats` reporting time played and damage taken per participant on victory, defeat, stop, or reset).
+- `scripts/lab-compare.sh` and a manual "Lab" workflow measure this build's server-thread CPU against another ref's in paired, counterbalanced server boots (maintainers only, like the integration suites).
+
+### Changed
+
+- Format normal shared-damage chat messages as `<player> took <damage> damage [♥ <hp>/<max>]` with trailing `.0` omitted and `<max>` reflecting active participants' actual max health.
+- Publish one family-universal jar per compatibility tier and loader (`mc1.21.1-1.21.4`, `mc1.21.11`, and `mc26.x` on Fabric and NeoForge) against Terra Rasa 0.5.1, while keeping per-version CI checks.
+- Enforce server-only environment metadata in CurseForge release uploads and add marketplace metadata sync and CurseForge repair workflows.
+- The integration suites now import the shared `mc-testkit` from the private `mc-tooling` repository, checked out at `../mc-tooling`, and `test_10_performance` reports game-loop CPU via `mc-lab`.
 
 ## 0.6.0
 

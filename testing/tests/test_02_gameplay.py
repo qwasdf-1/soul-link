@@ -32,10 +32,13 @@ def health(server, name: str) -> float:
 
 def test_damage_to_one_player_is_shared(server, players, running):
     alice, bob = players
+    mark = len(bob.state.messages)
     server.rcon("damage Alice 6 minecraft:generic")
     wait_true(lambda: abs(health(server, "Bob") - 14.0) < 0.01, 10, "Bob to share Alice's damage")
     assert abs(health(server, "Alice") - 14.0) < 0.01
     bob.wait_for(lambda s: s.health is not None and abs(s.health - 14.0) < 0.01, 10, "receive the shared health")
+    bob.wait_for(lambda s: any("Alice took 6 damage [\u2665 14/20]" in msg for msg in s.messages[mark:]),
+                 10, "receive normal damage report")
     status = server.status()
     assert abs(status["shared"]["health"] - 14.0) < 0.01
 
@@ -101,6 +104,7 @@ def test_end_portal_dragon_kill_is_victory(server, players, running):
     assert status["result"] == "VICTORY"
     for bot in players:
         bot.wait_for_message("dragon is dead", timeout=10)
+        bot.wait_for_message("Stats:", timeout=10)
         # Winners keep playing (exit portal, credits); only a defeat turns participants into spectators.
         assert server.player(bot.name)["gameMode"] == "survival"
         bot.assert_connected()

@@ -20,7 +20,9 @@ By default, every active participant has the same health, food, and saturation v
 - Damage from different participants adds to the shared health loss.
 - Healing is shared, but simultaneous healing only uses the largest individual health gain for that tick.
 - Food and saturation gains and losses from all participants are combined, then clamped to vanilla's allowed ranges.
-- Teammates receive a chat message naming players who lost health and showing the health lost and resulting shared pool. It identifies affected players, not the attacker or damage source.
+- Teammates receive a configurable chat message when damage occurs (`normal` shows `<player> took <amount> damage [♥ <hp>/<max>]` using the active max health, `minimal` shows `took <amount> damage`, and `off` hides chat reports). It identifies affected players, not the attacker or damage source.
+- The action-bar run timer can be shown or hidden with `timerVisible`.
+- At the end of a run (victory, defeat, stop, or reset), Soul Link can report concise per-player time played and damage taken (`runStats`).
 - Optional half-heart mode sets participant max health and the shared team pool to 1 health point. It is configured for the next run.
 - A hit to one participant is shown to teammates as a hurt animation and sound.
 - If the pool reaches zero, the run ends even if no participant has individually died.
@@ -59,13 +61,16 @@ Defeating the Ender Dragon in the canonical End ends the run in victory. Players
 | `/soullink setup pool <futureRuns>` | Operators | Set the future-run pool size to 1–3; the active run is not counted. |
 | `/soullink setup pregen <dimension> <radiusBlocks>` | Operators | Change a dimension's pregeneration radius for future preparations; `0` disables it. |
 | `/soullink prepare [seed|random] [preloadRadius]` | Operators | Discard queued ready runs and prepare a new one. Omitted seed means random; omitted radius uses the configured default. Use `random 0` to disable spawn preload. Wait for any current preparation to finish first. |
-| `/soullink rules sharedPotions <true\|false>` | Operators | Persist the shared-potions setting for the next run. |
-| `/soullink rules sharedVitality <true\|false>` | Operators | Persist whether health, food, and saturation are shared for the next run. |
-| `/soullink rules soulLinkHardcore <true\|false>` | Operators | Persist whether the first participant death ends the next run. |
-| `/soullink rules naturalRegeneration <true\|false>` | Operators | Change vanilla's world-persisted `naturalRegeneration` game rule immediately. |
-| `/soullink rules halfHeart <true\|false>` | Operators | Set each participant's maximum health and the shared pool to 1 HP from the next run. |
-| `/soullink rules allowLateJoin <true\|false>` | Operators | Allow or prevent new players from joining the active run immediately. |
-| `/soullink rules autoPrepare <true\|false>` | Operators | Enable or disable background preparation of future runs immediately. |
+| `/soullink rules sharedPotions <true\|false> [default]` | Operators | Set shared potions for the next run (pass `default` to save to `config/soullink.toml`). |
+| `/soullink rules sharedVitality <true\|false> [default]` | Operators | Set whether health, food, and saturation are shared for the next run (pass `default` to save). |
+| `/soullink rules soulLinkHardcore <true\|false> [default]` | Operators | Set whether the first participant death ends the next run (pass `default` to save). |
+| `/soullink rules naturalRegeneration <true\|false> [default]` | Operators | Change vanilla's `naturalRegeneration` rule immediately (pass `default` to save). |
+| `/soullink rules halfHeart <true\|false> [default]` | Operators | Set each participant's maximum health and the shared pool to 1 HP from the next run (pass `default` to save). |
+| `/soullink rules allowLateJoin <true\|false> [default]` | Operators | Allow or prevent new players from joining the active run immediately (pass `default` to save). |
+| `/soullink rules autoPrepare <true\|false> [default]` | Operators | Enable or disable background preparation of future runs immediately (pass `default` to save). |
+| `/soullink rules timerVisible <true\|false> [default]` | Operators | Show or hide the action-bar run timer immediately (pass `default` to save). |
+| `/soullink rules damageReport <normal\|minimal\|off> [default]` | Operators | Set shared-damage chat verbosity immediately (pass `default` to save). |
+| `/soullink rules runStats <true\|false> [default]` | Operators | Enable or disable concise end-of-run player stats immediately (pass `default` to save). |
 
 When enabled by `debugCommands`, operators also get `/soullink debug lifecycle`, `gc`, `probe`, `end`, `spawners`, `player <name>`, and `fail <point>`. These are diagnostic tools; lifecycle JSON is available through `debug lifecycle`. See [Configuration](configuration.md) before enabling failure injection.
 

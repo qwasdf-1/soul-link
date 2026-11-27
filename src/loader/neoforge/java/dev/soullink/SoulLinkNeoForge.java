@@ -20,6 +20,7 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.registries.RegisterEvent;
 import net.neoforged.neoforge.event.TagsUpdatedEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -161,6 +162,37 @@ public final class SoulLinkNeoForge {
                     event.setCanceled(true);
                 }
             });
+        }
+
+        @Override
+        public void onAfterDamage(AfterDamageCallback callback) {
+            java.lang.invoke.MethodHandle damageReader = resolvePostDamageReader();
+            NeoForge.EVENT_BUS.addListener(LivingDamageEvent.Post.class, event -> {
+                float damage = readPostDamage(damageReader, event);
+                if (damage > 0.0F) {
+                    callback.onAfterDamage(event.getEntity(), event.getSource(), damage);
+                }
+            });
+        }
+
+        private static java.lang.invoke.MethodHandle resolvePostDamageReader() {
+            var lookup = java.lang.invoke.MethodHandles.publicLookup();
+            var type = java.lang.invoke.MethodType.methodType(float.class);
+            for (String name : new String[]{"getHealthDamage", "getNewDamage"}) {
+                try {
+                    return lookup.findVirtual(LivingDamageEvent.Post.class, name, type);
+                } catch (NoSuchMethodException | IllegalAccessException ignored) {
+                }
+            }
+            throw new IllegalStateException("LivingDamageEvent.Post exposes neither getHealthDamage nor getNewDamage");
+        }
+
+        private static float readPostDamage(java.lang.invoke.MethodHandle reader, LivingDamageEvent.Post event) {
+            try {
+                return (float) reader.invokeExact(event);
+            } catch (Throwable t) {
+                throw new RuntimeException("Could not read post-damage amount", t);
+            }
         }
 
         @Override

@@ -12,13 +12,22 @@ from mc_testkit.server import ServerProcess
 
 
 class SoulLinkServer(ServerProcess):
-    """A test server driven through Soul Link's commands and configured by config/soullink.json."""
+    """A test server driven through Soul Link's commands and configured by config/soullink.toml."""
 
-    CONFIG_FILE = "soullink.json"
+    CONFIG_FILE = "soullink.toml"
     STATUS_COMMAND = "soullink debug lifecycle"
     PLAYER_COMMAND = "soullink debug player {name}"
     #: Pregeneration adds about a minute to every preparation; modules that test it opt in.
     CONFIG_DEFAULTS = {"pregeneration": {}}
+
+    def _prepare(self, config: dict[str, Any], level_seed: int) -> None:
+        super()._prepare(config, level_seed)
+        props_path = self.directory / "server.properties"
+        props = props_path.read_text(encoding="utf-8")
+        if "white-list=" not in props:
+            props_path.write_text(props + "white-list=false\n", encoding="utf-8")
+        merged = {**self.CONFIG_DEFAULTS, **config}
+        (self.directory / "config" / self.CONFIG_FILE).write_text(_to_toml(merged), encoding="utf-8")
 
     def dimension_dir(self, dimension: str) -> Path:
         """The directory where a dimension's storage lives (adapts between modern and legacy/classic)."""
@@ -97,6 +106,35 @@ def block_pos(player: dict[str, Any]) -> tuple[int, int, int]:
 
 #: Vanilla places a new player on a collision-free spot within the respawn_radius game rule (default 10).
 RESPAWN_RADIUS = 10
+
+
+def _toml_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, str):
+        escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+        return f'"{escaped}"'
+    if isinstance(value, list):
+        return "[" + ", ".join(_toml_value(item) for item in value) + "]"
+    raise TypeError(f"Unsupported TOML value: {value!r}")
+
+
+def _to_toml(data: dict[str, Any]) -> str:
+    lines: list[str] = []
+    tables: list[tuple[str, dict[str, Any]]] = []
+    for key, value in data.items():
+        if isinstance(value, dict):
+            tables.append((key, value))
+        else:
+            lines.append(f"{key} = {_toml_value(value)}")
+    for name, table in tables:
+        lines.append(f"\n[{name}]")
+        for subkey, subval in table.items():
+            escaped = subkey.replace("\\", "\\\\").replace('"', '\\"')
+            lines.append(f'"{escaped}" = {_toml_value(subval)}')
+    return "\n".join(lines) + "\n"
 
 
 def near_spawn(player: dict[str, Any], spawn: list[int]) -> bool:

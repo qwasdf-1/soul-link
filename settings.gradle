@@ -23,7 +23,10 @@ def minecraftVersion = providers.gradleProperty('minecraft_version').getOrElse('
 // The substituted artifact carries the loader tag, so a NeoForge build resolves Terra Rasa's NeoForge
 // artifact and a Fabric build its Fabric one. Read the `loader` property the way the build does.
 def neoforgeLoader = providers.gradleProperty('loader').getOrElse('fabric').toString().trim().toLowerCase() == 'neoforge'
-def terraRasaArtifact = "dev.terrarasa:terra-rasa-mc${minecraftVersion}${neoforgeLoader ? '-neoforge' : ''}"
+def targetLabel = providers.gradleProperty('terra_rasa_target_label')
+        .orElse(providers.gradleProperty('target_label'))
+        .getOrElse("mc${minecraftVersion}")
+def terraRasaArtifact = "dev.terrarasa:terra-rasa-${targetLabel}${neoforgeLoader ? '-neoforge' : ''}"
 if (terraRasaPath) {
     def terraRasa = file(terraRasaPath)
     if (!new File(terraRasa, 'settings.gradle').isFile()) {

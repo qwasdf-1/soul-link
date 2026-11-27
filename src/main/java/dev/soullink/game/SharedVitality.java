@@ -2,11 +2,13 @@ package dev.soullink.game;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.StringJoiner;
 
 import dev.soullink.MinecraftCompat;
+import dev.soullink.SoulLinkConfig;
 import net.minecraft.network.protocol.game.ClientboundHurtAnimationPacket;
 import net.minecraft.network.chat.Component;
 import net.minecraft.ChatFormatting;
@@ -14,6 +16,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Shared health, hunger and saturation (the Soul Link). Each tick, every participant's change since the
@@ -59,6 +62,11 @@ public final class SharedVitality {
 
     /** Returns true when the shared pool is depleted. */
     public boolean tick(List<ServerPlayer> participants) {
+        return tick(participants, SoulLinkConfig.DamageReportMode.NORMAL);
+    }
+
+    /** Returns true when the shared pool is depleted. */
+    public boolean tick(List<ServerPlayer> participants, SoulLinkConfig.DamageReportMode reportMode) {
         if (participants.isEmpty()) {
             return false;
         }
@@ -91,7 +99,7 @@ public final class SharedVitality {
         this.food = pool.food();
         this.saturation = pool.saturation();
         boolean someoneHurt = !damageTaken.isEmpty();
-        if (someoneHurt) {
+        if (someoneHurt && reportMode != SoulLinkConfig.DamageReportMode.OFF) {
             StringJoiner names = new StringJoiner(", ");
             float damage = 0.0F;
             for (ServerPlayer player : participants) {
@@ -101,13 +109,11 @@ public final class SharedVitality {
                     damage += taken;
                 }
             }
-            // Readable mid-fight: the heart, who took the hit, and the pool it came from as
-            // <current>/<max> so the maximum is only ever a denominator.
-            Component component = Component.literal(HEART + " ").withStyle(ChatFormatting.RED)
-                    .append(Component.literal(String.format(java.util.Locale.ROOT,
-                            "%s took %.1f damage (%.1f/%.1f)", names, damage, this.health, maxHealth)));
-            for (ServerPlayer player : participants) {
-                player.sendSystemMessage(component, false);
+            Component component = formatDamageReport(names.toString(), damage, this.health, maxHealth, reportMode);
+            if (component != null) {
+                for (ServerPlayer player : participants) {
+                    player.sendSystemMessage(component, false);
+                }
             }
         }
         if (this.health <= 0.0F) {
@@ -138,6 +144,29 @@ public final class SharedVitality {
             }
         }
         return true;
+    }
+
+    /** Formats a chat damage report according to the configured verbosity, or returns null when off. */
+    public static @Nullable Component formatDamageReport(String playerNames, float damage, float health, float maxHealth,
+            SoulLinkConfig.DamageReportMode mode) {
+        return switch (mode) {
+            case OFF -> null;
+            case MINIMAL -> Component.literal("took " + formatNumber(damage) + " damage");
+            case NORMAL -> Component.literal(playerNames + " took " + formatNumber(damage) + " damage [")
+                    .append(Component.literal(HEART + " ").withStyle(ChatFormatting.RED))
+                    .append(Component.literal(formatNumber(health) + "/" + formatNumber(maxHealth) + "]")
+                            .withStyle(ChatFormatting.WHITE));
+        };
+    }
+
+    /** Formats a number to one decimal place, dropping a trailing {@code .0} on whole numbers. */
+    public static String formatNumber(float value) {
+        float normalized = Math.abs(value) < 0.05F ? 0.0F : value;
+        String formatted = String.format(Locale.ROOT, "%.1f", normalized);
+        if (formatted.endsWith(".0")) {
+            return formatted.substring(0, formatted.length() - 2);
+        }
+        return formatted;
     }
 
     /** Folds per-player changes into the pool: damage and food add up, healing takes the largest gain. */

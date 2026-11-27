@@ -102,6 +102,15 @@ public final class SoulLinkInitializer implements ModInitializer {
         }
 
         @Override
+        public void onAfterDamage(AfterDamageCallback callback) {
+            ServerLivingEntityEvents.AFTER_DAMAGE.register((entity, source, baseDamageTaken, damageTaken, blocked) -> {
+                if (damageTaken > 0.0F) {
+                    callback.onAfterDamage(entity, source, damageTaken);
+                }
+            });
+        }
+
+        @Override
         public void onEntityDeath(BiConsumer<LivingEntity, DamageSource> callback) {
             ServerLivingEntityEvents.AFTER_DEATH.register(callback::accept);
         }

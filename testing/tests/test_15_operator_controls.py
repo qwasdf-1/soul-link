@@ -65,3 +65,30 @@ def test_operator_help_controls_and_run_rules(server, players):
     assert normal_health["rules"]["halfHeart"] is False
     assert normal_health["shared"]["health"] == 20.0
     assert all(server.player(bot.name)["health"] == 20.0 for bot in players)
+
+    # New display & stats rules work live and persist only when `default` is passed.
+    alice, bob = players
+    server.rcon("soullink rules naturalRegeneration false")
+    server.rcon("soullink rules timerVisible false")
+    assert server.status()["nextRules"]["timerVisible"] is False
+    server.rcon("soullink rules timerVisible true")
+
+    server.rcon("soullink rules damageReport minimal")
+    mark = len(bob.state.messages)
+    server.rcon("damage Alice 2 minecraft:generic")
+    bob.wait_for(lambda s: any(msg == "took 2 damage" for msg in s.messages[mark:]),
+                 10, "minimal damage report")
+
+    server.rcon("soullink rules damageReport off")
+    mark_off = len(bob.state.messages)
+    server.rcon("damage Bob 2 minecraft:generic")
+    wait_true(lambda: abs(server.player("Alice")["health"] - 16.0) < 0.01, 10, "damage to still sync when report is off")
+    assert not any("took" in msg for msg in bob.state.messages[mark_off:])
+    server.rcon("soullink rules damageReport normal")
+    server.rcon("soullink rules naturalRegeneration true")
+
+    # Abandoning a run via /soullink stop also reports concise end-of-run stats.
+    stop_mark = len(alice.state.messages)
+    server.rcon("soullink stop")
+    alice.wait_for(lambda s: any(msg.startswith("Stats:") and "Alice" in msg and "Bob" in msg for msg in s.messages[stop_mark:]),
+                   10, "end-of-run stats after stop")

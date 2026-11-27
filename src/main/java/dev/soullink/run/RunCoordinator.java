@@ -148,6 +148,7 @@ public final class RunCoordinator {
         // first run as soon as its spawn is ready; subsequent runs still wait for /soullink start.
         if (this.state.status == SoulLinkState.Status.LOBBY && this.state.runsStarted == 0
                 && this.state.activeRunId == null) {
+            MinecraftCompat.setNaturalRegeneration(this.server, this.config.naturalRegeneration);
             this.state.status = SoulLinkState.Status.STARTING;
         }
         save();
@@ -266,14 +267,20 @@ public final class RunCoordinator {
     }
 
     private void tickRunning() {
+        List<ServerPlayer> online = onlineParticipants();
         // The run clock only runs while someone is playing it: not while the server waits for players to
         // come back after a restart, and not while everyone has disconnected.
-        if (!this.state.timerPaused && !onlineParticipants().isEmpty()) {
+        if (!this.state.timerPaused && !online.isEmpty()) {
             this.state.elapsedTicks++;
+            for (ServerPlayer player : online) {
+                String uuid = player.getUUID().toString();
+                this.state.playerPlayTicks.merge(uuid, 1L, Long::sum);
+                this.state.playerNames.put(uuid, MinecraftCompat.playerName(player));
+            }
         }
         List<ServerPlayer> participants = activeParticipants();
         if (this.state.sharedVitality) {
-            if (this.vitality.tick(participants)) {
+            if (this.vitality.tick(participants, this.config.damageReport)) {
                 endRun(SoulLinkState.Result.DEFEAT, "the shared soul ran out of health");
                 for (ServerPlayer player : participants) {
                     MinecraftCompat.kill(player);
@@ -284,12 +291,12 @@ public final class RunCoordinator {
             this.state.sharedFood = this.vitality.food();
             this.state.sharedSaturation = this.vitality.saturation();
         }
-        if (this.ticks % TIMER_DISPLAY_INTERVAL_TICKS == 0) {
+        if (this.config.timerVisible && this.ticks % TIMER_DISPLAY_INTERVAL_TICKS == 0) {
             String display = this.state.timerPaused
                     ? "Paused — " + RunTimer.format(this.state.elapsedTicks)
                     : RunTimer.format(this.state.elapsedTicks);
             Component timer = Component.literal(display).withStyle(ChatFormatting.GOLD);
-            for (ServerPlayer player : onlineParticipants()) {
+            for (ServerPlayer player : online) {
                 player.sendSystemMessage(timer, true);
             }
         }
@@ -532,6 +539,9 @@ public final class RunCoordinator {
         this.state.timerPaused = false;
         this.state.participants.clear();
         this.state.eliminatedParticipants.clear();
+        this.state.playerPlayTicks.clear();
+        this.state.playerDamageTaken.clear();
+        this.state.playerNames.clear();
         ServerLevel overworld = this.server.overworld();
         for (ServerPlayer player : List.copyOf(this.server.getPlayerList().getPlayers())) {
             SessionReset.resetPlayer(this.server, player, GameType.SURVIVAL);
@@ -539,8 +549,10 @@ public final class RunCoordinator {
                 rememberMaxHealthBase(player);
             }
             MinecraftCompat.teleport(player, overworld, spawnPointFor(player, overworld, spawn), 0.0F, 0.0F);
-            this.state.participants.add(player.getUUID().toString());
-            this.state.playerRuns.put(player.getUUID().toString(), runId);
+            String uuid = player.getUUID().toString();
+            this.state.participants.add(uuid);
+            this.state.playerRuns.put(uuid, runId);
+            this.state.playerNames.put(uuid, MinecraftCompat.playerName(player));
         }
         if (this.state.halfHeart) {
             // Save restoration values before lowering max health, so a crash mid-transition can recover.
@@ -588,7 +600,11 @@ public final class RunCoordinator {
             }
         }
         save();
+        String statsLine = this.config.runStats ? formatRunStats() : null;
         if (result == SoulLinkState.Result.ABANDONED) {
+            if (statsLine != null) {
+                broadcast(Component.literal(statsLine).withStyle(ChatFormatting.GRAY));
+            }
             return;
         }
         boolean victory = result == SoulLinkState.Result.VICTORY;
@@ -599,6 +615,37 @@ public final class RunCoordinator {
                 .withHoverEvent(MinecraftCompat.showTextHoverEvent(Component.literal("Generate a fresh world and start"))));
         broadcast(Component.literal((victory ? "The dragon is dead! " : "Run over: " + reason + ". ") + "Time: " + time + " ")
                 .append(next));
+        if (statsLine != null) {
+            broadcast(Component.literal(statsLine).withStyle(ChatFormatting.GRAY));
+        }
+    }
+
+    @Nullable String formatRunStats() {
+        Map<String, String> onlineNames = new java.util.HashMap<>();
+        for (ServerPlayer player : onlineParticipants()) {
+            onlineNames.put(player.getUUID().toString(), MinecraftCompat.playerName(player));
+        }
+        return formatRunStats(this.state, onlineNames);
+    }
+
+    static @Nullable String formatRunStats(SoulLinkState state, Map<String, String> onlineNames) {
+        if (state.participants.isEmpty()) {
+            return null;
+        }
+        StringBuilder line = new StringBuilder("Stats: ");
+        boolean first = true;
+        for (String uuid : state.participants) {
+            if (!first) {
+                line.append(", ");
+            }
+            first = false;
+            String name = onlineNames.getOrDefault(uuid,
+                    state.playerNames.getOrDefault(uuid, uuid.substring(0, Math.min(8, uuid.length()))));
+            String time = RunTimer.format(state.playerPlayTicks.getOrDefault(uuid, 0L));
+            String dmg = SharedVitality.formatNumber((float) state.playerDamageTaken.getOrDefault(uuid, 0.0).doubleValue());
+            line.append(name).append(' ').append(time).append(" (").append(dmg).append(" dmg)");
+        }
+        return line.toString();
     }
 
     private void moveEveryoneToLobby() {
@@ -635,6 +682,7 @@ public final class RunCoordinator {
         switch (this.state.status) {
             case RUNNING -> {
                 if (currentParticipant) {
+                    this.state.playerNames.put(uuid, MinecraftCompat.playerName(player));
                     this.vitality.forget(player.getUUID());
                     if (this.state.eliminatedParticipants.contains(uuid)) {
                         placeEliminatedSpectator(player);
@@ -662,6 +710,7 @@ public final class RunCoordinator {
                     this.state.participants.add(uuid);
                     this.participantIds.add(player.getUUID());
                     this.state.playerRuns.put(uuid, this.state.activeRunId);
+                    this.state.playerNames.put(uuid, MinecraftCompat.playerName(player));
                     save();
                 } else {
                     sendToLobby(player);
@@ -700,6 +749,16 @@ public final class RunCoordinator {
 
     public void onPlayerLeave(ServerPlayer player) {
         this.vitality.forget(player.getUUID());
+    }
+
+    public void onPlayerDamaged(ServerPlayer player, float damageTaken) {
+        if (this.state.status == SoulLinkState.Status.RUNNING && isActiveParticipant(player) && damageTaken > 0.0F) {
+            String uuid = player.getUUID().toString();
+            this.state.playerNames.put(uuid, MinecraftCompat.playerName(player));
+            // Cap synthetic lethal hits like /kill (Float.MAX_VALUE) so end-of-run stats stay readable.
+            float recorded = damageTaken > 10_000.0F ? player.getMaxHealth() : damageTaken;
+            this.state.playerDamageTaken.merge(uuid, (double) recorded, Double::sum);
+        }
     }
 
     public void onPlayerDeath(ServerPlayer player) {
@@ -787,66 +846,91 @@ public final class RunCoordinator {
         return activeParticipants().stream().filter(other -> other != player).toList();
     }
 
-    /** Sets a run rule for the next run and persists it to the config file. */
-    public Component setSharedPotions(boolean enabled) {
+    /** Sets a run rule for the next run and optionally persists it as default in {@code soullink.toml}. */
+    public Component setSharedPotions(boolean enabled, boolean saveDefault) {
         boolean previous = this.config.sharedPotions;
-        this.config.sharedPotions = enabled;
-        try {
-            this.config.save(SoulLink.configPath());
-        } catch (IOException e) {
-            this.config.sharedPotions = previous;
-            SoulLink.LOGGER.error("Could not save the Soul Link config", e);
-            return Component.literal("Could not save the config: " + e.getMessage()).withStyle(ChatFormatting.RED);
-        }
-        return Component.literal("Shared potions " + (enabled ? "on" : "off") + " from the next run.");
+        return applyConfigChange(
+                () -> this.config.sharedPotions = enabled,
+                () -> this.config.sharedPotions = previous,
+                saveDefault,
+                "Shared potions " + (enabled ? "on" : "off") + " from the next run.");
     }
 
-    /** Persists shared health, food, and saturation for the next run. */
-    public Component setSharedVitality(boolean enabled) {
+    /** Updates shared health, food, and saturation for the next run. */
+    public Component setSharedVitality(boolean enabled, boolean saveDefault) {
         boolean previous = this.config.sharedVitality;
-        this.config.sharedVitality = enabled;
-        try {
-            this.config.save(SoulLink.configPath());
-        } catch (IOException e) {
-            this.config.sharedVitality = previous;
-            SoulLink.LOGGER.error("Could not save the Soul Link config", e);
-            return Component.literal("Could not save the config: " + e.getMessage()).withStyle(ChatFormatting.RED);
-        }
-        return Component.literal("Shared vitality " + (enabled ? "on" : "off") + " from the next run.");
+        return applyConfigChange(
+                () -> this.config.sharedVitality = enabled,
+                () -> this.config.sharedVitality = previous,
+                saveDefault,
+                "Shared vitality " + (enabled ? "on" : "off") + " from the next run.");
     }
 
-    /** Persists the one-death defeat rule for future runs. */
-    public Component setSoulLinkHardcore(boolean enabled) {
+    /** Updates the one-death defeat rule for future runs. */
+    public Component setSoulLinkHardcore(boolean enabled, boolean saveDefault) {
         boolean previous = this.config.soulLinkHardcore;
-        this.config.soulLinkHardcore = enabled;
-        try {
-            this.config.save(SoulLink.configPath());
-        } catch (IOException e) {
-            this.config.soulLinkHardcore = previous;
-            SoulLink.LOGGER.error("Could not save the Soul Link config", e);
-            return Component.literal("Could not save the config: " + e.getMessage()).withStyle(ChatFormatting.RED);
-        }
-        return Component.literal("Soul Link Hardcore " + (enabled ? "on" : "off") + " from the next run.");
+        return applyConfigChange(
+                () -> this.config.soulLinkHardcore = enabled,
+                () -> this.config.soulLinkHardcore = previous,
+                saveDefault,
+                "Soul Link Hardcore " + (enabled ? "on" : "off") + " from the next run.");
     }
 
-    /** Changes vanilla's world-persisted naturalRegeneration rule immediately. */
-    public Component setNaturalRegeneration(boolean enabled) {
-        MinecraftCompat.setNaturalRegeneration(this.server, enabled);
-        return Component.literal("Natural regeneration " + (enabled ? "enabled" : "disabled") + ".");
+    /** Changes vanilla's naturalRegeneration rule immediately and optionally saves the default. */
+    public Component setNaturalRegeneration(boolean enabled, boolean saveDefault) {
+        boolean previous = this.config.naturalRegeneration;
+        boolean previousRule = MinecraftCompat.naturalRegeneration(this.server);
+        return applyConfigChange(
+                () -> {
+                    this.config.naturalRegeneration = enabled;
+                    MinecraftCompat.setNaturalRegeneration(this.server, enabled);
+                },
+                () -> {
+                    this.config.naturalRegeneration = previous;
+                    MinecraftCompat.setNaturalRegeneration(this.server, previousRule);
+                },
+                saveDefault,
+                "Natural regeneration " + (enabled ? "enabled" : "disabled") + ".");
     }
 
-    /** Persists the half-heart setting for the next run. */
-    public Component setHalfHeart(boolean enabled) {
+    /** Updates the half-heart setting for the next run. */
+    public Component setHalfHeart(boolean enabled, boolean saveDefault) {
         boolean previous = this.config.halfHeart;
-        this.config.halfHeart = enabled;
-        try {
-            this.config.save(SoulLink.configPath());
-        } catch (IOException e) {
-            this.config.halfHeart = previous;
-            SoulLink.LOGGER.error("Could not save the Soul Link config", e);
-            return Component.literal("Could not save the config: " + e.getMessage()).withStyle(ChatFormatting.RED);
-        }
-        return Component.literal("Half-heart mode " + (enabled ? "on" : "off") + " from the next run.");
+        return applyConfigChange(
+                () -> this.config.halfHeart = enabled,
+                () -> this.config.halfHeart = previous,
+                saveDefault,
+                "Half-heart mode " + (enabled ? "on" : "off") + " from the next run.");
+    }
+
+    /** Changes whether the action-bar run timer is visible immediately. */
+    public Component setTimerVisible(boolean enabled, boolean saveDefault) {
+        boolean previous = this.config.timerVisible;
+        return applyConfigChange(
+                () -> this.config.timerVisible = enabled,
+                () -> this.config.timerVisible = previous,
+                saveDefault,
+                "Timer display " + (enabled ? "on" : "off") + " immediately.");
+    }
+
+    /** Changes shared-damage chat reporting verbosity immediately. */
+    public Component setDamageReport(SoulLinkConfig.DamageReportMode mode, boolean saveDefault) {
+        SoulLinkConfig.DamageReportMode previous = this.config.damageReport;
+        return applyConfigChange(
+                () -> this.config.damageReport = mode,
+                () -> this.config.damageReport = previous,
+                saveDefault,
+                "Damage report set to " + mode.id() + " immediately.");
+    }
+
+    /** Changes whether end-of-run per-player stats are broadcast immediately. */
+    public Component setRunStats(boolean enabled, boolean saveDefault) {
+        boolean previous = this.config.runStats;
+        return applyConfigChange(
+                () -> this.config.runStats = enabled,
+                () -> this.config.runStats = previous,
+                saveDefault,
+                "End-of-run stats " + (enabled ? "on" : "off") + " immediately.");
     }
 
     private void rememberMaxHealthBase(ServerPlayer player) {
@@ -892,7 +976,7 @@ public final class RunCoordinator {
                 .append("\nChanges apply to preparations begun after the setting is changed.")
                 .append("\nActive-run construction interval: ")
                 .append(this.config.activeRunConstructionIntervalTicks)
-                .append(" ticks per staged dimension; set activeRunConstructionIntervalTicks in config/soullink.json and restart.")
+                .append(" ticks per staged dimension; set activeRunConstructionIntervalTicks in config/soullink.toml and restart.")
                 .append("\nautoPrepare controls whether Soul Link fills the pool in the background.");
         return Component.literal(info.toString());
     }
@@ -907,6 +991,9 @@ public final class RunCoordinator {
                 MinecraftCompat.naturalRegeneration(this.server),
                 this.config.allowLateJoin,
                 this.config.autoPrepare,
+                this.config.timerVisible,
+                this.config.damageReport,
+                this.config.runStats,
                 this.config.preparedRunPoolSize,
                 this.preparation.readyCount(),
                 List.copyOf(this.policy.resettable()),
@@ -925,35 +1012,41 @@ public final class RunCoordinator {
         SetupMenuView.open(player, this, page, pageOffset);
     }
 
-    /** Persistently changes whether Soul Link fills the future-run pool in the background. */
-    public Component setAutoPrepare(boolean enabled) {
+    /** Changes whether Soul Link fills the future-run pool in the background. */
+    public Component setAutoPrepare(boolean enabled, boolean saveDefault) {
         boolean previous = this.config.autoPrepare;
-        this.config.autoPrepare = enabled;
-        try {
-            this.config.save(SoulLink.configPath());
-        } catch (IOException e) {
-            this.config.autoPrepare = previous;
-            SoulLink.LOGGER.error("Could not save the Soul Link config", e);
-            return Component.literal("Could not save the auto-prepare setting: " + e.getMessage())
-                    .withStyle(ChatFormatting.RED);
-        }
-        return Component.literal("Automatic future-run preparation " + (enabled ? "enabled" : "disabled")
-                + ". Any preparation already in progress will continue.");
+        return applyConfigChange(
+                () -> this.config.autoPrepare = enabled,
+                () -> this.config.autoPrepare = previous,
+                saveDefault,
+                "Automatic future-run preparation " + (enabled ? "enabled" : "disabled")
+                        + ". Any preparation already in progress will continue.");
     }
 
-    /** Persistently changes whether new players may join an active run. */
-    public Component setAllowLateJoin(boolean enabled) {
+    /** Changes whether new players may join an active run. */
+    public Component setAllowLateJoin(boolean enabled, boolean saveDefault) {
         boolean previous = this.config.allowLateJoin;
-        this.config.allowLateJoin = enabled;
+        return applyConfigChange(
+                () -> this.config.allowLateJoin = enabled,
+                () -> this.config.allowLateJoin = previous,
+                saveDefault,
+                "Late joins " + (enabled ? "allowed" : "disabled") + " immediately.");
+    }
+
+    private Component applyConfigChange(Runnable apply, Runnable rollback, boolean saveDefault, String message) {
+        apply.run();
+        if (!saveDefault) {
+            return Component.literal(message);
+        }
         try {
             this.config.save(SoulLink.configPath());
         } catch (IOException e) {
-            this.config.allowLateJoin = previous;
+            rollback.run();
             SoulLink.LOGGER.error("Could not save the Soul Link config", e);
-            return Component.literal("Could not save the late-join setting: " + e.getMessage())
+            return Component.literal("Could not save the config: " + e.getMessage())
                     .withStyle(ChatFormatting.RED);
         }
-        return Component.literal("Late joins " + (enabled ? "allowed" : "disabled") + " immediately.");
+        return Component.literal(message + " Saved default to soullink.toml.");
     }
 
     public Component setPreparedRunPoolSize(int futureRuns) {
@@ -1181,6 +1274,9 @@ public final class RunCoordinator {
         info.append("\nNext world: ").append(this.preparation.progressDescription());
         info.append("\nNatural regeneration: ")
                 .append(MinecraftCompat.naturalRegeneration(this.server) ? "enabled" : "disabled");
+        info.append("\nTimer display: ").append(this.config.timerVisible ? "on" : "off")
+                .append(" | Damage report: ").append(this.config.damageReport.id())
+                .append(" | Run stats: ").append(this.config.runStats ? "on" : "off");
         if (this.state.bestVictoryTicks != null) {
             info.append("\nBest time: ").append(RunTimer.format(this.state.bestVictoryTicks));
         }
@@ -1248,6 +1344,10 @@ public final class RunCoordinator {
         nextRules.addProperty("soulLinkHardcore", this.config.soulLinkHardcore);
         nextRules.addProperty("sharedPotions", this.config.sharedPotions);
         nextRules.addProperty("halfHeart", this.config.halfHeart);
+        nextRules.addProperty("naturalRegeneration", this.config.naturalRegeneration);
+        nextRules.addProperty("timerVisible", this.config.timerVisible);
+        nextRules.addProperty("damageReport", this.config.damageReport.id());
+        nextRules.addProperty("runStats", this.config.runStats);
         json.add("nextRules", nextRules);
         json.add("tickCost", this.tickCost.describe());
         json.addProperty("runsStarted", this.state.runsStarted);

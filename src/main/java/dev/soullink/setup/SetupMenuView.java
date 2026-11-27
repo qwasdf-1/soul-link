@@ -40,7 +40,11 @@ public final class SetupMenuView {
     }
 
     public static SimpleContainer createInventory(RunCoordinator coordinator, Page page, int pageOffset) {
-        int rows = page == Page.PREGENERATION ? 6 : 3;
+        int rows = switch (page) {
+            case PREGENERATION -> 6;
+            case MAIN -> 4;
+            case ADVANCED -> 3;
+        };
         SimpleContainer inventory = new SimpleContainer(rows * 9);
         render(inventory, coordinator, page, pageOffset);
         return inventory;
@@ -72,24 +76,27 @@ public final class SetupMenuView {
         SetupSnapshot settings = coordinator.setupSnapshot();
         if (page == Page.MAIN) {
             switch (slot) {
-                case 10 -> response = coordinator.setSharedVitality(!settings.sharedVitality());
-                case 11 -> response = coordinator.setSoulLinkHardcore(!settings.soulLinkHardcore());
-                case 12 -> response = coordinator.setSharedPotions(!settings.sharedPotions());
-                case 13 -> response = coordinator.setHalfHeart(!settings.halfHeart());
-                case 14 -> response = coordinator.setNaturalRegeneration(!settings.naturalRegeneration());
-                case 15 -> response = coordinator.setAllowLateJoin(!settings.allowLateJoin());
-                case 16 -> response = coordinator.setAutoPrepare(!settings.autoPrepare());
-                case 19 -> response = coordinator.setPreparedRunPoolSize(settings.preparedRunPoolSize() - 1);
-                case 21 -> response = coordinator.setPreparedRunPoolSize(settings.preparedRunPoolSize() + 1);
-                case 23 -> {
+                case 10 -> response = coordinator.setSharedVitality(!settings.sharedVitality(), true);
+                case 11 -> response = coordinator.setSoulLinkHardcore(!settings.soulLinkHardcore(), true);
+                case 12 -> response = coordinator.setSharedPotions(!settings.sharedPotions(), true);
+                case 13 -> response = coordinator.setHalfHeart(!settings.halfHeart(), true);
+                case 14 -> response = coordinator.setNaturalRegeneration(!settings.naturalRegeneration(), true);
+                case 15 -> response = coordinator.setAllowLateJoin(!settings.allowLateJoin(), true);
+                case 16 -> response = coordinator.setAutoPrepare(!settings.autoPrepare(), true);
+                case 19 -> response = coordinator.setTimerVisible(!settings.timerVisible(), true);
+                case 20 -> response = coordinator.setDamageReport(settings.damageReport().next(), true);
+                case 21 -> response = coordinator.setRunStats(!settings.runStats(), true);
+                case 28 -> response = coordinator.setPreparedRunPoolSize(settings.preparedRunPoolSize() - 1);
+                case 30 -> response = coordinator.setPreparedRunPoolSize(settings.preparedRunPoolSize() + 1);
+                case 32 -> {
                     open(player, coordinator, Page.PREGENERATION, 0);
                     return;
                 }
-                case 24 -> {
+                case 33 -> {
                     open(player, coordinator, Page.ADVANCED, 0);
                     return;
                 }
-                case 26 -> {
+                case 35 -> {
                     MinecraftCompat.closeSetupMenu(player);
                     return;
                 }
@@ -182,13 +189,18 @@ public final class SetupMenuView {
         inventory.setItem(14, toggle(Items.REDSTONE, "Natural regeneration (immediate)", settings.naturalRegeneration()));
         inventory.setItem(15, toggle(Items.ENDER_PEARL, "Allow late joins (immediate)", settings.allowLateJoin()));
         inventory.setItem(16, toggle(Items.CLOCK, "Automatic preparation (immediate)", settings.autoPrepare()));
-        inventory.setItem(19, named(Items.REDSTONE, "Decrease future-run pool", ChatFormatting.RED));
-        inventory.setItem(20, named(Items.CHEST, "Future-run pool: " + settings.preparedRunPoolSize()
+        inventory.setItem(19, toggle(Items.COMPASS, "Timer display (immediate)", settings.timerVisible()));
+        inventory.setItem(20, named(Items.IRON_SWORD,
+                "Damage report (immediate): " + settings.damageReport().id().toUpperCase(java.util.Locale.ROOT),
+                settings.damageReport() == dev.soullink.SoulLinkConfig.DamageReportMode.OFF ? ChatFormatting.RED : ChatFormatting.GREEN));
+        inventory.setItem(21, toggle(Items.WRITABLE_BOOK, "End-of-run stats (immediate)", settings.runStats()));
+        inventory.setItem(28, named(Items.REDSTONE, "Decrease future-run pool", ChatFormatting.RED));
+        inventory.setItem(29, named(Items.CHEST, "Future-run pool: " + settings.preparedRunPoolSize()
                 + " (" + settings.readyRunCount() + " ready)", ChatFormatting.GOLD));
-        inventory.setItem(21, named(Items.SLIME_BALL, "Increase future-run pool", ChatFormatting.GREEN));
-        inventory.setItem(23, named(Items.MAP, "Optional pregeneration", ChatFormatting.AQUA));
-        inventory.setItem(24, named(Items.BOOK, "Advanced settings (some require restart)", ChatFormatting.YELLOW));
-        inventory.setItem(26, named(Items.BARRIER, "Close", ChatFormatting.RED));
+        inventory.setItem(30, named(Items.SLIME_BALL, "Increase future-run pool", ChatFormatting.GREEN));
+        inventory.setItem(32, named(Items.MAP, "Optional pregeneration", ChatFormatting.AQUA));
+        inventory.setItem(33, named(Items.BOOK, "Advanced settings (some require restart)", ChatFormatting.YELLOW));
+        inventory.setItem(35, named(Items.BARRIER, "Close", ChatFormatting.RED));
     }
 
     private static void renderPregeneration(SimpleContainer inventory, SetupSnapshot settings, int pageOffset) {
@@ -248,7 +260,7 @@ public final class SetupMenuView {
         inventory.setItem(17, named(Items.OBSIDIAN,
                 "Persistent dimensions: " + settings.persistentDimensions().size() + " (click to list)",
                 ChatFormatting.AQUA));
-        inventory.setItem(22, named(Items.PAPER, "Edit config/soullink.json and restart to change these values.",
+        inventory.setItem(22, named(Items.PAPER, "Edit config/soullink.toml and restart to change these values.",
                 ChatFormatting.GRAY));
         inventory.setItem(26, named(Items.BARRIER, "Close", ChatFormatting.RED));
     }

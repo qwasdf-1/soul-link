@@ -24,6 +24,15 @@ if (neoforgeLoader) {
 ext.modArchiveName = project.mod_id
 apply from: rootProject.file('gradle/mod-conventions.gradle')
 
+dependencies {
+    if (neoforgeLoader) {
+        implementation 'org.tomlj:tomlj:2.2.0'
+        jarJar 'org.tomlj:tomlj:2.2.0'
+    } else {
+        include(implementation('org.tomlj:tomlj:2.2.0'))
+    }
+}
+
 // Real dedicated-server integration testing (shared with Terra Rasa's build).
 apply from: rootProject.file('gradle/integration-server.gradle')
 def integrationServerDirectory = integrationRoot.map { it.dir('server') }

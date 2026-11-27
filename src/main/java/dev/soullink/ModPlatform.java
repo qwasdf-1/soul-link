@@ -56,12 +56,20 @@ public interface ModPlatform {
     /** A player respawned, whether from a death or from the End portal. */
     void onPlayerRespawn(Consumer<ServerPlayer> callback);
 
+    @FunctionalInterface
+    interface AfterDamageCallback {
+        void onAfterDamage(LivingEntity entity, DamageSource source, float damageTaken);
+    }
+
     /**
      * Whether the named living entity may take this damage. Lobby players are protected here, so a
      * false result prevents the damage exactly as returning {@code false} from Fabric's
      * {@code ALLOW_DAMAGE} callback does.
      */
     void onAllowDamage(BiPredicate<LivingEntity, DamageSource> callback);
+
+    /** A living entity finished taking damage after armor and mitigation. */
+    void onAfterDamage(AfterDamageCallback callback);
 
     /** A living entity died. Players are handled as run participants, dragons as a victory. */
     void onEntityDeath(BiConsumer<LivingEntity, DamageSource> callback);

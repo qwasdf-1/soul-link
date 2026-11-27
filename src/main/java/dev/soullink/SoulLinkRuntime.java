@@ -24,7 +24,9 @@ public final class SoulLinkRuntime {
     public static void register(ModPlatform platform) {
         SoulLink.setPlatform(platform);
 
-        SoulLinkConfig config = SoulLinkConfig.load(platform.configFile(SoulLink.CONFIG_FILE));
+        SoulLinkConfig config = SoulLinkConfig.load(
+                platform.configFile(SoulLink.CONFIG_FILE),
+                platform.configFile(SoulLink.LEGACY_CONFIG_FILE));
         config.normalize();
         config.validate();
         // Dimensions that runs never reset (the lobby, external ones) keep the world's original seed.
@@ -88,6 +90,12 @@ public final class SoulLinkRuntime {
             RunCoordinator coordinator = RunCoordinator.active();
             return !(entity instanceof ServerPlayer player && coordinator != null
                     && coordinator.shouldCancelLobbyDamage(player, source));
+        });
+        platform.onAfterDamage((entity, source, damageTaken) -> {
+            RunCoordinator coordinator = RunCoordinator.active();
+            if (entity instanceof ServerPlayer player && coordinator != null) {
+                coordinator.onPlayerDamaged(player, damageTaken);
+            }
         });
         platform.onEntityDeath((entity, source) -> {
             RunCoordinator coordinator = RunCoordinator.active();

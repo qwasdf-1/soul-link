@@ -13,7 +13,8 @@ import org.slf4j.LoggerFactory;
 public final class SoulLink {
 
     public static final String MOD_ID = "soullink";
-    public static final String CONFIG_FILE = "soullink.json";
+    public static final String CONFIG_FILE = "soullink.toml";
+    public static final String LEGACY_CONFIG_FILE = "soullink.json";
     public static final Logger LOGGER = LoggerFactory.getLogger("Soul Link");
 
     private static volatile @org.jspecify.annotations.Nullable ModPlatform platform;
@@ -46,5 +47,9 @@ public final class SoulLink {
 
     public static Path configPath() {
         return platform().configFile(CONFIG_FILE);
+    }
+
+    public static Path legacyConfigPath() {
+        return platform().configFile(LEGACY_CONFIG_FILE);
     }
 }

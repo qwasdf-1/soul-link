@@ -3,6 +3,7 @@ package dev.soullink.setup;
 import java.util.List;
 import java.util.Map;
 
+import dev.soullink.SoulLinkConfig;
 import dev.terrarasa.ResourceIdentifier;
 
 /** Immutable view of the settings displayed by the operator setup menu. */
@@ -14,6 +15,9 @@ public record SetupSnapshot(
         boolean naturalRegeneration,
         boolean allowLateJoin,
         boolean autoPrepare,
+        boolean timerVisible,
+        SoulLinkConfig.DamageReportMode damageReport,
+        boolean runStats,
         int preparedRunPoolSize,
         int readyRunCount,
         List<ResourceIdentifier> resettableDimensions,

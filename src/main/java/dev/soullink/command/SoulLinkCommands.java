@@ -11,7 +11,9 @@ import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import dev.soullink.SoulLinkConfig;
 import dev.soullink.mixin.EnderDragonFightAccessor;
 import dev.soullink.MinecraftCompat;
 import dev.soullink.run.RunCoordinator;
@@ -62,34 +64,22 @@ public final class SoulLinkCommands {
                                         IntegerArgumentType.getInteger(ctx, "preloadRadius"))))));
         var rules = Commands.literal("rules")
                 .requires(source -> MinecraftCompat.hasPermission(source, 2))
-                .then(Commands.literal("sharedVitality")
-                        .then(Commands.argument("enabled", BoolArgumentType.bool())
-                                .executes(ctx -> reply(ctx, coordinator -> coordinator.setSharedVitality(
-                                        BoolArgumentType.getBool(ctx, "enabled"))))))
-                .then(Commands.literal("soulLinkHardcore")
-                        .then(Commands.argument("enabled", BoolArgumentType.bool())
-                                .executes(ctx -> reply(ctx, coordinator -> coordinator.setSoulLinkHardcore(
-                                        BoolArgumentType.getBool(ctx, "enabled"))))))
-                .then(Commands.literal("sharedPotions")
-                        .then(Commands.argument("enabled", BoolArgumentType.bool())
-                                .executes(ctx -> reply(ctx, coordinator -> coordinator.setSharedPotions(
-                                        BoolArgumentType.getBool(ctx, "enabled"))))))
-                .then(Commands.literal("naturalRegeneration")
-                        .then(Commands.argument("enabled", BoolArgumentType.bool())
-                                .executes(ctx -> reply(ctx, coordinator -> coordinator.setNaturalRegeneration(
-                                        BoolArgumentType.getBool(ctx, "enabled"))))))
-                .then(Commands.literal("halfHeart")
-                        .then(Commands.argument("enabled", BoolArgumentType.bool())
-                                .executes(ctx -> reply(ctx, coordinator -> coordinator.setHalfHeart(
-                                        BoolArgumentType.getBool(ctx, "enabled"))))))
-                .then(Commands.literal("allowLateJoin")
-                        .then(Commands.argument("enabled", BoolArgumentType.bool())
-                                .executes(ctx -> reply(ctx, coordinator -> coordinator.setAllowLateJoin(
-                                        BoolArgumentType.getBool(ctx, "enabled"))))))
-                .then(Commands.literal("autoPrepare")
-                        .then(Commands.argument("enabled", BoolArgumentType.bool())
-                                .executes(ctx -> reply(ctx, coordinator -> coordinator.setAutoPrepare(
-                                        BoolArgumentType.getBool(ctx, "enabled"))))));
+                .then(booleanRule("sharedVitality", RunCoordinator::setSharedVitality))
+                .then(booleanRule("soulLinkHardcore", RunCoordinator::setSoulLinkHardcore))
+                .then(booleanRule("sharedPotions", RunCoordinator::setSharedPotions))
+                .then(booleanRule("naturalRegeneration", RunCoordinator::setNaturalRegeneration))
+                .then(booleanRule("halfHeart", RunCoordinator::setHalfHeart))
+                .then(booleanRule("allowLateJoin", RunCoordinator::setAllowLateJoin))
+                .then(booleanRule("autoPrepare", RunCoordinator::setAutoPrepare))
+                .then(booleanRule("timerVisible", RunCoordinator::setTimerVisible))
+                .then(booleanRule("runStats", RunCoordinator::setRunStats))
+                .then(Commands.literal("damageReport")
+                        .then(Commands.argument("mode", StringArgumentType.word())
+                                .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
+                                        java.util.List.of("normal", "minimal", "off"), builder))
+                                .executes(ctx -> setDamageReport(ctx, false))
+                                .then(Commands.literal("default")
+                                        .executes(ctx -> setDamageReport(ctx, true)))));
         var setup = Commands.literal("setup")
                 .requires(source -> MinecraftCompat.hasPermission(source, 2))
                 .executes(SoulLinkCommands::openSetup)
@@ -199,18 +189,49 @@ public final class SoulLinkCommands {
                 + "  /soullink prepare [seed|random] [preloadRadius]: replace queued worlds and prepare a run\n"
                 + "    radius is 0–32 chunks; omitted radius uses the configured default. Use 'random 0' to disable preload.\n"
                 + "    wait for any current preparation to finish before replacing the pool\n"
-                + "  /soullink rules sharedVitality <true|false>: link health, food, and saturation starting next run\n"
-                + "  /soullink rules soulLinkHardcore <true|false>: end on any participant death starting next run\n"
-                + "  /soullink rules sharedPotions <true|false>: share potion effects starting next run\n"
-                + "  /soullink rules naturalRegeneration <true|false>: change vanilla's gamerule now\n"
-                + "  /soullink rules halfHeart <true|false>: set participants to half a heart starting next run\n"
-                + "  /soullink rules allowLateJoin <true|false>: allow new players into an active run now\n"
-                + "  /soullink rules autoPrepare <true|false>: enable or disable background future-run preparation now\n"
+                + "  /soullink rules sharedVitality <true|false> [default]: link health, food, and saturation starting next run\n"
+                + "  /soullink rules soulLinkHardcore <true|false> [default]: end on any participant death starting next run\n"
+                + "  /soullink rules sharedPotions <true|false> [default]: share potion effects starting next run\n"
+                + "  /soullink rules naturalRegeneration <true|false> [default]: change natural regeneration now\n"
+                + "  /soullink rules halfHeart <true|false> [default]: set participants to half a heart starting next run\n"
+                + "  /soullink rules allowLateJoin <true|false> [default]: allow new players into an active run now\n"
+                + "  /soullink rules autoPrepare <true|false> [default]: enable or disable background future-run preparation now\n"
+                + "  /soullink rules timerVisible <true|false> [default]: show or hide the action-bar run timer now\n"
+                + "  /soullink rules damageReport <normal|minimal|off> [default]: set shared-damage chat verbosity now\n"
+                + "  /soullink rules runStats <true|false> [default]: report per-player time and damage when a run ends\n"
+                + "    add 'default' to save the change as the new default in config/soullink.toml\n"
                 + "Examples: /soullink prepare 12345 6; /soullink setup pregen minecraft:overworld 750; "
-                + "/soullink rules halfHeart true\n"
+                + "/soullink rules halfHeart true default\n"
                 + "Use /soullink debug lifecycle for machine-readable diagnostics when debugCommands is enabled.";
         ctx.getSource().sendSuccess(() -> Component.literal(text), false);
         return 1;
+    }
+
+    @FunctionalInterface
+    private interface BooleanRuleSetter {
+        Component apply(RunCoordinator coordinator, boolean enabled, boolean saveDefault);
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> booleanRule(String name, BooleanRuleSetter setter) {
+        return Commands.literal(name)
+                .then(Commands.argument("enabled", BoolArgumentType.bool())
+                        .executes(ctx -> reply(ctx, coordinator -> setter.apply(
+                                coordinator, BoolArgumentType.getBool(ctx, "enabled"), false)))
+                        .then(Commands.literal("default")
+                                .executes(ctx -> reply(ctx, coordinator -> setter.apply(
+                                        coordinator, BoolArgumentType.getBool(ctx, "enabled"), true)))));
+    }
+
+    private static int setDamageReport(CommandContext<CommandSourceStack> ctx, boolean saveDefault) {
+        String raw = StringArgumentType.getString(ctx, "mode");
+        SoulLinkConfig.DamageReportMode mode;
+        try {
+            mode = SoulLinkConfig.DamageReportMode.parse(raw);
+        } catch (IllegalArgumentException e) {
+            ctx.getSource().sendFailure(Component.literal(e.getMessage()));
+            return 0;
+        }
+        return reply(ctx, coordinator -> coordinator.setDamageReport(mode, saveDefault));
     }
 
     private static int reply(CommandContext<CommandSourceStack> ctx, Function<RunCoordinator, Component> action) {

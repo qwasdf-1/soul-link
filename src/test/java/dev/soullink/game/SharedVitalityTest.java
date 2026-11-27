@@ -1,11 +1,15 @@
 package dev.soullink.game;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.util.List;
 
+import dev.soullink.SoulLinkConfig.DamageReportMode;
 import dev.soullink.game.SharedVitality.Delta;
 import dev.soullink.game.SharedVitality.Pool;
+import net.minecraft.network.chat.Component;
 import org.junit.jupiter.api.Test;
 
 class SharedVitalityTest {
@@ -35,5 +39,26 @@ class SharedVitalityTest {
         assertEquals(0.0F, starving.health());
         assertEquals(0, starving.food());
         assertEquals(0.0F, starving.saturation());
+    }
+
+    @Test
+    void formatsDamageReportAcrossModesAndCustomMaxHealth() {
+        Component normal = SharedVitality.formatDamageReport("Alice", 2.0F, 18.0F, 20.0F, DamageReportMode.NORMAL);
+        assertNotNull(normal);
+        assertEquals("Alice took 2 damage [\u2665 18/20]", normal.getString());
+
+        Component halfHeart = SharedVitality.formatDamageReport("Alice", 0.5F, 0.5F, 1.0F, DamageReportMode.NORMAL);
+        assertNotNull(halfHeart);
+        assertEquals("Alice took 0.5 damage [\u2665 0.5/1]", halfHeart.getString());
+
+        Component boostedMax = SharedVitality.formatDamageReport("Bob", 2.5F, 21.5F, 24.0F, DamageReportMode.NORMAL);
+        assertNotNull(boostedMax);
+        assertEquals("Bob took 2.5 damage [\u2665 21.5/24]", boostedMax.getString());
+
+        Component minimal = SharedVitality.formatDamageReport("Alice", 3.5F, 16.5F, 20.0F, DamageReportMode.MINIMAL);
+        assertNotNull(minimal);
+        assertEquals("took 3.5 damage", minimal.getString());
+
+        assertNull(SharedVitality.formatDamageReport("Alice", 3.5F, 16.5F, 20.0F, DamageReportMode.OFF));
     }
 }

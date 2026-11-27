@@ -14,21 +14,21 @@ description="Cooperative Soul Link speedruns on dedicated servers and integrated
 [[dependencies.soullink]]
 modId="neoforge"
 type="required"
-versionRange="[${loader_version},)"
+versionRange="${loader_range}"
 ordering="NONE"
 side="SERVER"
 
 [[dependencies.soullink]]
 modId="minecraft"
 type="required"
-versionRange="[${minecraft_version}]"
+versionRange="${minecraft_range}"
 ordering="NONE"
 side="SERVER"
 
 [[dependencies.soullink]]
 modId="terrarasa"
 type="required"
-versionRange="[${terra_rasa_version},)"
+versionRange="${terra_rasa_range}"
 ordering="NONE"
 side="SERVER"
 

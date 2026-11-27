@@ -5,7 +5,7 @@ The rule is off by default and, like Soul Link Speedrun's chaos settings, a chan
 
 from __future__ import annotations
 
-import json
+import tomllib
 
 import pytest
 
@@ -34,8 +34,11 @@ def test_rule_change_applies_from_the_next_run(server, players):
     assert "next run" in output
     status = server.status()
     assert status["nextRules"]["sharedPotions"] and not status["rules"]["sharedPotions"]
-    config = json.loads((server.directory / "config" / "soullink.json").read_text())
-    assert config["sharedPotions"] is True, "the rule is persisted to the operator config"
+    config = tomllib.loads((server.directory / "config" / "soullink.toml").read_text())
+    assert config.get("sharedPotions", False) is False, "runtime rule change keeps soullink.toml default unchanged"
+    server.rcon("soullink rules sharedPotions true default")
+    config = tomllib.loads((server.directory / "config" / "soullink.toml").read_text())
+    assert config["sharedPotions"] is True, "passing default persists the rule to soullink.toml"
     server.rcon("effect give Alice minecraft:haste 60 0")
     assert "minecraft:haste" not in effects(server, "Bob"), "the running run keeps its rules"
 

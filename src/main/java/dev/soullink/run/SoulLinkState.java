@@ -72,6 +72,12 @@ public final class SoulLinkState {
     public List<String> onboardedOperators = new ArrayList<>();
     /** Player UUID to the run their saved player state belongs to (FR-07 for offline players). */
     public Map<String, String> playerRuns = new LinkedHashMap<>();
+    /** Ticks played by each participant during the current run. */
+    public Map<String, Long> playerPlayTicks = new LinkedHashMap<>();
+    /** Total post-mitigation damage taken by each participant during the current run. */
+    public Map<String, Double> playerDamageTaken = new LinkedHashMap<>();
+    /** Last known username for each participant UUID in the current run. */
+    public Map<String, String> playerNames = new LinkedHashMap<>();
     public float sharedHealth = -1.0F;
     public int sharedFood = 20;
     public float sharedSaturation = 5.0F;
@@ -103,6 +109,9 @@ public final class SoulLinkState {
         copy.eliminatedParticipants = new ArrayList<>(this.eliminatedParticipants);
         copy.onboardedOperators = new ArrayList<>(this.onboardedOperators);
         copy.playerRuns = new LinkedHashMap<>(this.playerRuns);
+        copy.playerPlayTicks = new LinkedHashMap<>(this.playerPlayTicks);
+        copy.playerDamageTaken = new LinkedHashMap<>(this.playerDamageTaken);
+        copy.playerNames = new LinkedHashMap<>(this.playerNames);
         copy.sharedHealth = this.sharedHealth;
         copy.sharedFood = this.sharedFood;
         copy.sharedSaturation = this.sharedSaturation;
@@ -162,6 +171,45 @@ public final class SoulLinkState {
                     });
                     sanitized |= !valid.equals(state.playerRuns);
                     state.playerRuns = valid;
+                }
+                if (state.playerPlayTicks == null) {
+                    state.playerPlayTicks = new LinkedHashMap<>();
+                    sanitized = true;
+                } else {
+                    Map<String, Long> valid = new LinkedHashMap<>();
+                    state.playerPlayTicks.forEach((playerId, ticks) -> {
+                        if (isCanonicalUuid(playerId) && ticks != null && ticks >= 0L) {
+                            valid.put(playerId, ticks);
+                        }
+                    });
+                    sanitized |= !valid.equals(state.playerPlayTicks);
+                    state.playerPlayTicks = valid;
+                }
+                if (state.playerDamageTaken == null) {
+                    state.playerDamageTaken = new LinkedHashMap<>();
+                    sanitized = true;
+                } else {
+                    Map<String, Double> valid = new LinkedHashMap<>();
+                    state.playerDamageTaken.forEach((playerId, damage) -> {
+                        if (isCanonicalUuid(playerId) && damage != null && Double.isFinite(damage) && damage >= 0.0) {
+                            valid.put(playerId, damage);
+                        }
+                    });
+                    sanitized |= !valid.equals(state.playerDamageTaken);
+                    state.playerDamageTaken = valid;
+                }
+                if (state.playerNames == null) {
+                    state.playerNames = new LinkedHashMap<>();
+                    sanitized = true;
+                } else {
+                    Map<String, String> valid = new LinkedHashMap<>();
+                    state.playerNames.forEach((playerId, name) -> {
+                        if (isCanonicalUuid(playerId) && name != null && !name.isBlank()) {
+                            valid.put(playerId, name);
+                        }
+                    });
+                    sanitized |= !valid.equals(state.playerNames);
+                    state.playerNames = valid;
                 }
                 if (state.onboardedOperators == null) {
                     state.onboardedOperators = new ArrayList<>();
