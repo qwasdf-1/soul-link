@@ -8,6 +8,9 @@ import pytest
 
 from helpers import start_run, wait_true
 
+# Exercises initial STARTING-state preparation errors before the first run enters play.
+FRESH_SERVER = True
+
 
 @pytest.fixture(scope="module")
 def players(server):

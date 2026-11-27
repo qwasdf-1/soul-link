@@ -1,6 +1,9 @@
 package dev.soullink;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
@@ -18,6 +21,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.damagesource.DamageSource;
 
@@ -33,7 +37,35 @@ public final class SoulLinkInitializer implements ModInitializer {
         SoulLinkRuntime.register(new FabricPlatform());
     }
 
-    private record FabricPlatform() implements ModPlatform {
+    private static final class FabricPlatform implements ModPlatform {
+        private final List<Map.Entry<MinecraftServer, ServerGamePacketListenerImpl>> pendingJoins = new ArrayList<>();
+        private Consumer<ServerPlayer> joinCallback;
+
+        private FabricPlatform() {
+            // Registered before SoulLinkRuntime hooks onEndServerTick so deferred joins flush (after
+            // placeNewPlayer finishes addNewPlayer) right before RunCoordinator.tick() syncs vitality.
+            ServerTickEvents.END_SERVER_TICK.register(this::flushPendingJoins);
+            ServerLifecycleEvents.SERVER_STOPPED.register(server ->
+                    this.pendingJoins.removeIf(entry -> entry.getKey() == server));
+        }
+
+        private void flushPendingJoins(MinecraftServer server) {
+            if (this.pendingJoins.isEmpty() || this.joinCallback == null) {
+                return;
+            }
+            for (int i = 0; i < this.pendingJoins.size(); i++) {
+                var entry = this.pendingJoins.get(i);
+                if (entry.getKey() != server) {
+                    continue;
+                }
+                this.pendingJoins.remove(i--);
+                ServerGamePacketListenerImpl handler = entry.getValue();
+                if (!handler.player.isRemoved()
+                        && server.getPlayerList().getPlayer(handler.player.getUUID()) == handler.player) {
+                    this.joinCallback.accept(handler.player);
+                }
+            }
+        }
         @Override
         public Path configFile(String name) {
             return FabricLoader.getInstance().getConfigDir().resolve(name);
@@ -77,13 +109,9 @@ public final class SoulLinkInitializer implements ModInitializer {
 
         @Override
         public void onPlayerJoin(Consumer<ServerPlayer> callback) {
-            ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
-                server.execute(() -> {
-                    if (!handler.player.isRemoved()) {
-                        callback.accept(handler.player);
-                    }
-                });
-            });
+            this.joinCallback = callback;
+            ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
+                    this.pendingJoins.add(Map.entry(server, handler)));
         }
 
         @Override

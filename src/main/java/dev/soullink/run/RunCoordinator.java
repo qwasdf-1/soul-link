@@ -659,6 +659,10 @@ public final class RunCoordinator {
         ServerPlayer current = player;
         if (current.isDeadOrDying() || current.isRemoved()) {
             current = this.server.getPlayerList().respawn(current, false, Entity.RemovalReason.KILLED);
+            if (current.connection != null) {
+                current.connection.player = current;
+                current.connection.resetPosition();
+            }
         }
         restoreMaxHealthBase(current);
         SessionReset.resetPlayer(this.server, current, GameType.ADVENTURE);
