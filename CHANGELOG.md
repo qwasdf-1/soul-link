@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.1
+
+### Fixed
+
+- Rebind the network handler (`connection.player`) and reset position after auto-respawning a dead player on lobby transition so later disconnects cleanly remove the respawned player from the run world.
+- Defer Fabric join handling past `PlayerList.placeNewPlayer` via `ServerTickEvents.END_SERVER_TICK` (before coordinator ticks) so players saved in the lobby joining an active run do not have their Overworld entity tracking overwritten by late lobby placement.
+
 ## 0.7.0
 
 ### Added
